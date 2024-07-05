@@ -6,7 +6,7 @@ import pickle
 import numpy as np
 from tqdm import tqdm
 
-from base import ConditionRes
+from base import ConditionRes, LabelScene
 
 ROOT_PATH = "/mnt/train2/PnP/road_percep_0605/"
 CONDITION_RES = "/mnt/train2/RoadPercep/eric.wang/tmp_data/0704_ego_path_parse/"
@@ -46,5 +46,6 @@ if __name__ == "__main__":
 
                     condition_res = ConditionRes(condition_pickle_path)
 
-                    print(condition_res)
+                    label_scene = LabelScene(label_pickle_path)
+
                     exit(0)
