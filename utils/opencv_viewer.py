@@ -47,12 +47,25 @@ class View:
         y = int((1 - v) * self.height)  # Invert y for pixel coordinates
         return x, y
 
+    def convert_uv_array_to_pixel(self, u: np.ndarray, v: np.ndarray):
+        x = (u * self.width).astype(np.int32)
+        y = ((1 - v) * self.height).astype(np.int32)
+        return x, y
+
     def draw_line(self, frame, start_space, end_space, color=(255, 0, 0), thickness=2):
         start_uv = self.convert_space_to_uv(*start_space)
         end_uv = self.convert_space_to_uv(*end_space)
         start_point = self.convert_uv_to_pixel(*start_uv)
         end_point = self.convert_uv_to_pixel(*end_uv)
         cv2.line(frame, start_point, end_point, color, thickness)
+
+    def draw_polyline(self, frame, x, y, color=(0, 255, 0), thickness=2):
+        points = np.array(
+            self.convert_uv_array_to_pixel(*self.convert_space_to_uv(x, y)),
+            dtype=np.int32,
+        ).T
+
+        cv2.polylines(frame, [points], isClosed=False, color=color, thickness=thickness)
 
     def draw_rectangle(
         self, frame, top_left_space, bottom_right_space, color=(0, 255, 0), thickness=2
@@ -122,7 +135,7 @@ class View:
 
 
 if __name__ == "__main__":
-    view = View(1600, 800, (160, 80), center=(0, 0), angle=np.pi / 2)
+    view = View(1600, 800, (160, 80), center=(0, 0), angle=0.0)
 
     frame = view.build_frame()
     print("???")
@@ -132,6 +145,9 @@ if __name__ == "__main__":
     view.draw_circle(frame, (0, 0), 20)
     view.draw_rotated_rectangle(frame, (10, 0), (20, 5), np.pi / 3)
     view.draw_text(frame, "Test", (10, 10))
+    view.draw_polyline(
+        frame, np.array([0.0, 1.0, 2.0, 3.0]), np.array([0.0, 1.0, 1.0, 0.0])
+    )
 
     ret = cv2.imwrite("./test.png", frame)
 
