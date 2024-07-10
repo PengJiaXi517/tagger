@@ -77,3 +77,8 @@ class LabelScene:
         self.ego_path_info: EgoPathInfo = EgoPathInfo(label["ego_path_info"])
         self.percepmap: Dict = PercepMap(label["percepmap"])
         self.obstacles: Dict = label["obstacles"]
+
+class TagData:
+    def __init__(self, label_path: os.PathLike, condition_path: os.PathLike) -> None:
+        self.label_scene: LabelScene = LabelScene(label_path)
+        self.condition_res: ConditionRes = ConditionRes(condition_path)

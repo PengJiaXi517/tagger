@@ -1,0 +1,4 @@
+
+tag_pipelines = {
+    'demo': {}
+}
