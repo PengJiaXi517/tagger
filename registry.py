@@ -11,14 +11,16 @@ class RegisterMachine(object):
             name = obj.__name__
             self._name_method_map[name] = obj
         else:
+
             def wrapper(func):
                 name = func.__name__
                 self._name_method_map[name] = func
                 return func
+
             return wrapper
 
     def get(self, name):
         return self._name_method_map[name]
 
-TAG_FUNCTIONS = RegisterMachine("tag_functions")
 
+TAG_FUNCTIONS = RegisterMachine("tag_functions")
