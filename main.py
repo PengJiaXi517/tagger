@@ -10,6 +10,7 @@ from utils.config import Config
 from tag_functions.demo import *
 from tag_functions.path_risk import *
 from tag_functions.map_risk import *
+from tag_functions.condition_risk import *
 from tag_functions.ego_state import *
 from base import ConditionRes, LabelScene, TagData
 from registry import TAG_FUNCTIONS
@@ -30,9 +31,10 @@ class TagParse:
         self, base_data_root, condition_data_root, save_data_root, pickle_sub_path
     ):
         self.read_data(base_data_root, condition_data_root, pickle_sub_path)
-        self.tag_result = {}
+        self.tag_result = {'data_root': base_data_root,
+                           'file_path': pickle_sub_path,}
         for k, v in self.cfg.get("tag_pipelines", {}).items():
-            sub_tag_res = TAG_FUNCTIONS.get(k)(self.tag_data, v, self.tag_result)
+            sub_tag_res = TAG_FUNCTIONS.get(k)(self.tag_data, v)
             assert type(sub_tag_res) is dict
             assert len(sub_tag_res.keys() & self.tag_result.keys()) == 0
             self.tag_result.update(sub_tag_res)
@@ -43,8 +45,8 @@ class TagParse:
             osp.join(save_data_root, "/".join(pickle_sub_path.split("/")[:-1])),
             exist_ok=True,
         )
-        with open(os.path.join(save_data_root, pickle_sub_path), "wb") as f:
-            pickle.dump(self.tag_result, f)
+        with open(os.path.join(save_data_root, pickle_sub_path.replace('.pickle', '.json')), "w") as f:
+            json.dump(self.tag_result, f, indent=4)
 
 
 if __name__ == "__main__":
@@ -55,7 +57,7 @@ if __name__ == "__main__":
     json_file = "/mnt/train2/RoadPercep/eric.wang/path_tag_logs/0711/part_0.json"
     save_root = "/mnt/train2/RoadPercep/eric.wang/path_tag/test"
     cfg_file = (
-        "/mnt/train2/RoadPercep/eric.wang/Code/path-nn-tagger/cfg/config.debug.py"
+        "/mnt/train2/RoadPercep/eric.wang/Code/path-nn-tagger/cfg/config.risk.py"
     )
 
     with open(json_file, "r") as f:

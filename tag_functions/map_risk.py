@@ -5,9 +5,9 @@ from registry import TAG_FUNCTIONS
 
 
 @TAG_FUNCTIONS.register()
-def map_risk(data, params, result):
+def map_risk(data, params):
 
-    output = {}
+    output = {'map_risk':{}}
     tag_ego_path_curb_cross_risk = False
     tag_lane_curb_cross_risk = False
 
@@ -28,7 +28,7 @@ def map_risk(data, params, result):
                 if curb_string.crosses(line_string) or curb_string.crosses(line_string):
                     tag_lane_curb_cross_risk = True
 
-    output["tag_ego_path_curb_cross_risk"] = tag_ego_path_curb_cross_risk
-    output["tag_lane_curb_cross_risk"] = tag_lane_curb_cross_risk
+    output['map_risk']["tag_ego_path_curb_cross_risk"] = tag_ego_path_curb_cross_risk
+    output['map_risk']["tag_lane_curb_cross_risk"] = tag_lane_curb_cross_risk
 
     return output

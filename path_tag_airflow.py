@@ -68,4 +68,4 @@ if __name__ == '__main__':
                            os.path.join(args.split_json_path, 'part_{}.json'.format(i)),
                            args.save_root,
                            args.cfg_file)
-        break
+        # break

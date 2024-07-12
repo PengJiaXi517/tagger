@@ -7,9 +7,9 @@ from registry import TAG_FUNCTIONS
 
 
 @TAG_FUNCTIONS.register()
-def path_risk(data, params, result):
+def path_risk(data, params):
 
-    output = {}
+    output = {'path_risk':{}}
     tag_ego_path_valid_length_risk = False
     tag_ego_path_endpoint_condition_lane_risk = False
     tag_ego_path_endpoint_not_in_map_risk = True
@@ -56,11 +56,11 @@ def path_risk(data, params, result):
             if line_string.distance(end_point) < 5:
                 tag_ego_path_endpoint_not_in_map_risk = False
 
-    output["tag_ego_path_valid_length_risk"] = tag_ego_path_valid_length_risk
-    output[
+    output['path_risk']["tag_ego_path_valid_length_risk"] = tag_ego_path_valid_length_risk
+    output['path_risk'][
         "tag_ego_path_endpoint_condition_lane_risk"
     ] = tag_ego_path_endpoint_condition_lane_risk
-    output[
+    output['path_risk'][
         "tag_ego_path_endpoint_not_in_map_risk"
     ] = tag_ego_path_endpoint_not_in_map_risk
 

@@ -7,9 +7,9 @@ from registry import TAG_FUNCTIONS
 
 
 @TAG_FUNCTIONS.register()
-def ego_state_location(data, params, result):
+def ego_state_location(data, params):
 
-    output = {}
+    output = {'ego_state_location':{}}
 
     in_juction = False
     before_juction = False
@@ -21,10 +21,10 @@ def ego_state_location(data, params, result):
     label_scene = data.label_scene
 
     if len(label_scene.ego_path_info.future_path) == 0:
-        output["ego_in_juction"] = in_juction
-        output["ego_before_juction"] = before_juction
-        output["ego_after_juction"] = after_juction
-        output["ego_in_road"] = in_road
+        output['ego_state_location']["ego_in_juction"] = in_juction
+        output['ego_state_location']["ego_before_juction"] = before_juction
+        output['ego_state_location']["ego_after_juction"] = after_juction
+        output['ego_state_location']["ego_in_road"] = in_road
         return output
 
     if label_scene.ego_path_info.in_junction_id[0] is not None:
@@ -70,34 +70,34 @@ def ego_state_location(data, params, result):
                 ):
                     in_road = True
 
-    output["ego_in_juction"] = in_juction
-    output["ego_before_juction"] = before_juction
-    output["ego_after_juction"] = after_juction
-    output["ego_in_road"] = in_road
+    output['ego_state_location']["ego_in_juction"] = in_juction
+    output['ego_state_location']["ego_before_juction"] = before_juction
+    output['ego_state_location']["ego_after_juction"] = after_juction
+    output['ego_state_location']["ego_in_road"] = in_road
 
     return output
 
 
 @TAG_FUNCTIONS.register()
-def ego_state_speed(data, params, result):
+def ego_state_speed(data, params):
 
-    output = {}
+    output = {'ego_state_speed':{}}
 
     label_scene = data.label_scene
 
     speed_odom_x = label_scene.obstacles[-9]["features"]["history_states"][-1]["vx"]
     speed_odom_y = label_scene.obstacles[-9]["features"]["history_states"][-1]["vy"]
 
-    output["ego_speed_odom_x"] = speed_odom_x
-    output["ego_speed_odom_y"] = speed_odom_y
+    output['ego_state_speed']["ego_speed_odom_x"] = speed_odom_x
+    output['ego_state_speed']["ego_speed_odom_y"] = speed_odom_y
 
     return output
 
 
 @TAG_FUNCTIONS.register()
-def ego_state_map_environment(data, params, result):
+def ego_state_map_environment(data, params):
 
-    output = {}
+    output = {'ego_state_map_environment':{}}
 
     ego_range_has_intersection = False
     ego_range_nearest_intersection_area = 0
@@ -164,30 +164,30 @@ def ego_state_map_environment(data, params, result):
                 label_scene.percepmap.lane_map[exit_lane_id]["unit_directions"][-1]
             )
 
-    output["ego_range_has_intersection"] = ego_range_has_intersection
-    output["ego_range_nearest_intersection_area"] = ego_range_nearest_intersection_area
-    output[
+    output['ego_state_map_environment']["ego_range_has_intersection"] = ego_range_has_intersection
+    output['ego_state_map_environment']["ego_range_nearest_intersection_area"] = ego_range_nearest_intersection_area
+    output['ego_state_map_environment'][
         "ego_range_nearest_intersection_exist_lane_nums"
     ] = ego_range_nearest_intersection_exist_lane_nums
-    output[
+    output['ego_state_map_environment'][
         "ego_range_nearest_intersection_entry_lane_nums"
     ] = ego_range_nearest_intersection_entry_lane_nums
-    output[
+    output['ego_state_map_environment'][
         "ego_range_nearest_intersection_exist_lane_dir_vector"
     ] = ego_range_nearest_intersection_exist_lane_dir_vector
-    output[
+    output['ego_state_map_environment'][
         "ego_range_nearest_intersection_entry_lane_dir_vector"
     ] = ego_range_nearest_intersection_entry_lane_dir_vector
-    output["ego_range_has_m2n"] = ego_range_has_m2n
-    output["ego_range_num_lanes"] = ego_range_num_lanes
+    output['ego_state_map_environment']["ego_range_has_m2n"] = ego_range_has_m2n
+    output['ego_state_map_environment']["ego_range_num_lanes"] = ego_range_num_lanes
 
     return output
 
 
 @TAG_FUNCTIONS.register()
-def ego_state_obs_environment(data, params, result):
+def ego_state_obs_environment(data, params):
 
-    output = {}
+    output = {'ego_state_obs_environment':{}}
 
     ego_range_5m_obs_nums = 0
     ego_range_5m_vehicle_nums = 0
@@ -214,6 +214,6 @@ def ego_state_obs_environment(data, params, result):
                 if start_point.distance(obs_point) < 5:
                     ego_range_5m_obs_nums += 1
 
-    output["ego_range_5m_obs_nums"] = ego_range_5m_obs_nums
-    output["ego_range_5m_vehicle_nums"] = ego_range_5m_vehicle_nums
+    output['ego_state_obs_environment']["ego_range_5m_obs_nums"] = ego_range_5m_obs_nums
+    output['ego_state_obs_environment']["ego_range_5m_vehicle_nums"] = ego_range_5m_vehicle_nums
     return output
