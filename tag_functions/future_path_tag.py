@@ -115,6 +115,36 @@ class JunctionPATHTag:
         }
 
 
+@dataclass
+class ConditionResTag:
+    start_lane_seq_ids: List[List[int]] = field(default_factory=list)
+    end_lane_seq_ids: List[List[int]] = field(default_factory=list)
+
+    def as_dict(self):
+        return {
+            "start_lane_seq_ids": self.start_lane_seq_ids,
+            "end_lane_seq_ids": self.end_lane_seq_ids,
+        }
+
+
+def label_condition_res_tag(data: TagData, params: Dict) -> ConditionResTag:
+    condition_pair = data.condition_res.lane_seq_pair
+    lane_seq_ids = data.condition_res.seq_lane_ids_raw
+
+    condition_res_tag = ConditionResTag()
+    for idx_start, idx_end, _ in condition_pair:
+        if idx_start != -1:
+            condition_res_tag.start_lane_seq_ids.append(lane_seq_ids[idx_start])
+        else:
+            condition_res_tag.start_lane_seq_ids.append([])
+        if idx_end != -1:
+            condition_res_tag.end_lane_seq_ids.append(lane_seq_ids[idx_end])
+        else:
+            condition_res_tag.end_lane_seq_ids.append([])
+
+    return condition_res_tag
+
+
 class FuturePATHType(Enum):
     UNKNOWN = 0
     CRUISE = 1
@@ -130,6 +160,7 @@ class FuturePathTag:
     cruise_path_tag: List[CruisePATHTag] = None
     lc_path_tag: List[LcPATHTag] = None
     junction_path_tag: JunctionPATHTag = None
+    condition_res_tag: ConditionResTag = None
     is_backing_up: bool = False
 
     def as_dict(self):
@@ -148,6 +179,11 @@ class FuturePathTag:
             "junction_path_tag": (
                 self.junction_path_tag.as_dict()
                 if self.junction_path_tag is not None
+                else None
+            ),
+            "condition_res_tag": (
+                self.condition_res_tag.as_dict()
+                if self.condition_res_tag is not None
                 else None
             ),
             "is_backing_up": self.is_backing_up,
@@ -242,6 +278,8 @@ def label_lc_tag(
                     if lane_id in lane_seq:
                         first_arrive_lane_seq_idx = i
                         break
+            if first_arrive_lane_seq_idx != num_points_on_lane - 1:
+                break
 
         lc_path_tag = LcPATHTag()
         lc_path_tag.labeled_lane_seq = lane_seq
@@ -532,8 +570,11 @@ def future_path_tag(data: TagData, params: Dict) -> Dict:
     if future_path_tag.path_type in [
         FuturePATHType.CROSS_JUNCTION_CRUISE,
         FuturePATHType.CROSS_JUNCTION_LC,
+        FuturePATHType.CROSS_JUNCTION_UNKNWON,
     ]:
         future_path_tag.junction_path_tag = label_junction_tag(data, params, percep_map)
+
+    future_path_tag.condition_res_tag = label_condition_res_tag(data, params)
 
     future_path_tag.is_backing_up = label_backing_up_tag(data, params)
 
