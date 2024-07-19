@@ -29,8 +29,8 @@ class View:
     def convert_space_to_uv(self, x: Union[float, np.array], y: Union[float, np.array]):
         """Convert space coordinates to UV coordinates."""
         # Translate coordinates
-        x -= self.center_x
-        y -= self.center_y
+        x = x - self.center_x
+        y = y - self.center_y
 
         # Rotate coordinates using the precomputed rotation matrix
         vec = np.array([x, y])

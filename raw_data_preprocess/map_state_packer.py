@@ -1,5 +1,7 @@
+import functools
 import time
 from bisect import bisect_right
+from copy import deepcopy
 from random import shuffle
 from typing import Any, Dict, List, Tuple, Union
 
@@ -72,7 +74,7 @@ class MapLaneSeqPacker:
         max_num_lane_seqs: int = 64,
         x_range=(-50, 150),
         y_range=(-100, 100),
-        filter_roi_range=True,
+        filter_roi_range=False,
         roi_x_range=(-50, 150),
         roi_y_range=(-50, 50),
         interp_fast: bool = True,
@@ -127,6 +129,139 @@ class MapLaneSeqPacker:
             lane_id = lane["id"]
             lane_id_map[lane_id] = idx
         return lane_id_map
+
+    def collect_lanes_online(
+        self, lanes: List[Dict[str, Any]], ego_curr_state: Dict, search_radius=142.0
+    ):
+        search_lanes = []
+        search_central_point = np.array(
+            [
+                ego_curr_state["x"] + 50 * np.cos(ego_curr_state["theta"]),
+                ego_curr_state["y"] + 50 * np.sin(ego_curr_state["theta"]),
+            ]
+        ).reshape(1, 2)
+        for idx, lane in enumerate(lanes):
+            if self.filter_virtual and self.is_virtual_lane(lane):
+                continue
+            if lane["type"] not in self.filter_lane_type:
+                continue
+            central_polyline = np.array(lane["polyline"])
+            distance = np.min(
+                np.linalg.norm(central_polyline - search_central_point, axis=-1)
+            )
+            if distance > search_radius:
+                continue
+            search_lanes.append(lane)
+
+        sorted_search_lanes = self.sort_search_lanes(
+            search_lanes, search_central_point.reshape((2,))
+        )
+
+        return sorted_search_lanes
+
+    def sort_search_lanes(
+        self, search_lanes: List[Dict[str, Any]], search_central_point
+    ):
+        lanes_and_dist = []
+        for idx, lane_info in enumerate(search_lanes):
+            if len(lane_info["polyline"]) < 2:
+                continue
+            start_p = np.array(lane_info["polyline"][0])
+            end_p = np.array(lane_info["polyline"][-1])
+            center_p = (start_p + end_p) / 2.0
+            dis_middle = np.linalg.norm((center_p - search_central_point))
+            dis_start = np.linalg.norm(start_p - search_central_point)
+            dis_end = np.linalg.norm(end_p - search_central_point)
+            lanes_and_dist.append([idx, np.min([dis_middle, dis_end, dis_start])])
+
+        def cmp_lane_and_dist(lane_and_dist_a, lane_and_dist_b):
+            if lane_and_dist_a[1] == lane_and_dist_b[1]:
+                if (
+                    search_lanes[lane_and_dist_a[0]]["id"]
+                    < search_lanes[lane_and_dist_b[0]]["id"]
+                ):
+                    return -1
+                else:
+                    return 1
+            if lane_and_dist_a[1] < lane_and_dist_b[1]:
+                return -1
+            return 1
+
+        lanes_and_dist = sorted(
+            lanes_and_dist, key=functools.cmp_to_key(cmp_lane_and_dist)
+        )
+        # lanes_and_dist.sort(key=lambda x: x[1])
+
+        sorted_search_lanes = []
+        for idx, dis in lanes_and_dist:
+            sorted_search_lanes.append(search_lanes[idx])
+
+        return sorted_search_lanes
+
+    def dfs_build_lane_seq(
+        self,
+        now_idx,
+        successor_nodes,
+        visit_flags: np.ndarray,
+        lane_seq: List[int],
+        lane_seqs: List[List[int]],
+    ):
+        if len(successor_nodes[now_idx]) == 0:
+            lane_seq.append(now_idx)
+            lane_seqs.append(deepcopy(lane_seq))
+            del lane_seq[-1]
+            return
+
+        next_count = 0
+        lane_seq.append(now_idx)
+        visit_flags[now_idx] = 1
+        for next_idx in successor_nodes[now_idx]:
+            if visit_flags[next_idx] == 0:
+                self.dfs_build_lane_seq(
+                    next_idx, successor_nodes, visit_flags, lane_seq, lane_seqs
+                )
+                next_count += 1
+
+        if next_count == 0:
+            lane_seqs.append(deepcopy(lane_seq))
+        visit_flags[now_idx] = 0
+        del lane_seq[-1]
+        return
+
+    def dfs_build_lane_graph(self, search_lanes: List[Dict[str, Any]]):
+        lane_id_2_idx_map = {}
+        for idx, lane in enumerate(search_lanes):
+            lane_id_2_idx_map[lane["id"]] = idx
+        node_num = len(lane_id_2_idx_map)
+
+        successor_nodes = [[] for _ in range(len(lane_id_2_idx_map))]
+        in_degree_nodes = np.zeros((len(lane_id_2_idx_map),), dtype=np.int32)
+        out_degree_nodes = np.zeros((len(lane_id_2_idx_map),), dtype=np.int32)
+        idx_2_lane_map = [None for _ in range(len(lane_id_2_idx_map))]
+
+        for idx, lane in enumerate(search_lanes):
+            idx_2_lane_map[idx] = lane
+
+            for succ_id in lane["successor_id"]:
+                if succ_id not in lane_id_2_idx_map:
+                    continue
+                out_idx = lane_id_2_idx_map[succ_id]
+                successor_nodes[idx].append(out_idx)
+                in_degree_nodes[out_idx] += 1
+                out_degree_nodes[idx] += 1
+
+        # TODO: build lane graph here
+        lane_seqs: List[List[int]] = []
+        lane_seq: List[int] = []
+        visit_flag = np.zeros((node_num,), dtype=np.int32)
+
+        for i in range(node_num):
+            if in_degree_nodes[i] == 0:
+                self.dfs_build_lane_seq(
+                    i, successor_nodes, visit_flag, lane_seq, lane_seqs
+                )
+
+        return lane_id_2_idx_map, idx_2_lane_map, lane_seqs
 
     def get_lane_start_distances(
         self, lanes: List[Dict[str, Any]], ego_curr_state: Dict
@@ -184,6 +319,8 @@ class MapLaneSeqPacker:
             cycle_edges = nx.find_cycle(graph)
         except nx.NetworkXNoCycle:
             return [graph]
+        # logger = MMLogger.get_current_instance()
+        # logger.warning(f"{self.file_path} find loops!")
 
         start_nodes = []
         for node in graph:
@@ -444,12 +581,16 @@ class MapLaneSeqPacker:
                     rb_widths = np.linalg.norm(
                         lane_polyline - lane_right_boundary, axis=-1
                     )
-                    # interp_lb_widths = np.interp(idx_fp, np.arange(len(original_s)), lb_widths)
-                    # interp_rb_widths = np.interp(idx_fp, np.arange(len(original_s)), rb_widths)
-                    # curr_lane_states[:, 4] = interp_lb_widths
-                    # curr_lane_states[:, 6] = interp_rb_widths
-                    curr_lane_states[:, 4] = lb_widths[idx_left]
-                    curr_lane_states[:, 6] = rb_widths[idx_left]
+                    interp_lb_widths = np.interp(
+                        idx_fp, np.arange(len(original_s)), lb_widths
+                    )
+                    interp_rb_widths = np.interp(
+                        idx_fp, np.arange(len(original_s)), rb_widths
+                    )
+                    curr_lane_states[:, 4] = interp_lb_widths
+                    curr_lane_states[:, 6] = interp_rb_widths
+                    # curr_lane_states[:, 4] = lb_widths[idx_left]
+                    # curr_lane_states[:, 6] = rb_widths[idx_left]
                     curr_lane_states[:, 5] = [
                         self.lane_boundary_type_mapping[
                             lane["left_boundary"]["boundary_type"][idx_left_][1][0]
@@ -493,12 +634,62 @@ class MapLaneSeqPacker:
                 return True, lane_idx
         return False, -1
 
+    def remove_duplicated_lane_seqs(self, exists_lane_seqs):
+        candidate_lane_seq_idx = [
+            (idx, lane_seq) for idx, lane_seq in enumerate(exists_lane_seqs)
+        ]
+
+        def cmp_lane_seq(seq_a, seq_b):
+            if len(seq_a[1]) == len(seq_b[1]):
+                if seq_a[0] < seq_b[0]:
+                    return -1
+                else:
+                    return 1
+            if len(seq_a[1]) > len(seq_b[1]):
+                return -1
+            else:
+                return 1
+
+        def is_lane_seq_belong_to_another(target_lane_seq, source_lane_seq):
+            if len(target_lane_seq) < len(source_lane_seq):
+                return False
+            is_belong = False
+            for i in range(len(target_lane_seq) - len(source_lane_seq) + 1):
+                is_belong = True
+                for j in range(len(source_lane_seq)):
+                    if target_lane_seq[i + j] != source_lane_seq[j]:
+                        is_belong = False
+                        break
+                if is_belong:
+                    return True
+
+            return False
+
+        candidate_lane_seq_idx = sorted(
+            candidate_lane_seq_idx, key=functools.cmp_to_key(cmp_lane_seq)
+        )
+
+        filter_index = []
+        for i, source_lane_seq in candidate_lane_seq_idx:
+            is_keep = True
+            for j in filter_index:
+                target_lane_seq = exists_lane_seqs[j]
+                if is_lane_seq_belong_to_another(target_lane_seq, source_lane_seq):
+                    is_keep = False
+                    break
+            if is_keep:
+                filter_index.append(i)
+
+        filter_index = sorted(filter_index)
+
+        return filter_index
+
     def process(self, lanes, ego_curr_state):
-        lane_id_map = self.collect_lanes(lanes)
-        lane_graph = self.build_lane_graph(lane_id_map, lanes)
-        sub_graphs = self.get_connected_subgraphs(lane_graph)
-        lane_start_distances = self.get_lane_start_distances(lanes, ego_curr_state)
-        lane_seqs = self.get_lane_sequences(sub_graphs, lane_start_distances)
+        # reimpl
+        search_lanes = self.collect_lanes_online(lanes, ego_curr_state)
+        lane_id_2_idx_map, idx_2_lane_map, lane_seqs = self.dfs_build_lane_graph(
+            search_lanes
+        )
 
         collected_lane_seqs = 0
         all_lane_states = np.zeros((self.max_num_lane_seqs, self.max_num_nodes, 9))
@@ -512,49 +703,48 @@ class MapLaneSeqPacker:
                 break
             if self.interp_fast:
                 lane_states, lane_ids_raw = self.pack_lane_seq_fast(
-                    lane_seq, lanes, state_cache
+                    lane_seq, search_lanes, state_cache
                 )
             else:
                 lane_states, lane_ids_raw = self.pack_lane_seq(
-                    lane_seq, lanes, state_cache
+                    lane_seq, search_lanes, state_cache
                 )
             segs = self.cut_lane_seq(lane_states, lane_ids_raw, ego_curr_state)
             for state, lane_ids in segs:
                 if collected_lane_seqs >= self.max_num_lane_seqs:
-                    print(f"{self.file_path} excceeds max lane thr!")
                     break
-                curr_lane_ids = set([lanes[idx]["id"] for idx in lane_ids])
+                curr_lane_ids = set([search_lanes[idx]["id"] for idx in lane_ids])
                 curr_lane_ids_raw = []
                 for idx in lane_ids_raw:
-                    lane_id = lanes[idx]["id"]
+                    lane_id = search_lanes[idx]["id"]
                     if lane_id in curr_lane_ids_raw:
                         continue
                     if lane_id in curr_lane_ids:
                         curr_lane_ids_raw.append(lane_id)
-                found_same, same_lane_idx = self.found_same_lane_seq(
-                    curr_lane_ids, exists_lane_seqs
-                )
-                if found_same and same_lane_idx > 0:
-                    exists_lane_seqs[same_lane_idx] = curr_lane_ids
-                    all_lane_states[
-                        same_lane_idx, : min(len(state), self.max_num_nodes)
-                    ] = state[: self.max_num_nodes]
-                    all_lane_states_mask[
-                        same_lane_idx, : min(len(state), self.max_num_nodes)
-                    ] = 1
-                    all_lane_ids[same_lane_idx] = curr_lane_ids
-                    all_lane_ids_raw[same_lane_idx] = curr_lane_ids_raw
-                elif not found_same:
-                    exists_lane_seqs.append(curr_lane_ids)
-                    all_lane_states[
-                        collected_lane_seqs, : min(len(state), self.max_num_nodes)
-                    ] = state[: self.max_num_nodes]
-                    all_lane_states_mask[
-                        collected_lane_seqs, : min(len(state), self.max_num_nodes)
-                    ] = 1
-                    all_lane_ids.append(curr_lane_ids)
-                    all_lane_ids_raw.append(curr_lane_ids_raw)
-                    collected_lane_seqs += 1
+
+                exists_lane_seqs.append(curr_lane_ids_raw)
+                all_lane_states[
+                    collected_lane_seqs, : min(len(state), self.max_num_nodes)
+                ] = state[: self.max_num_nodes]
+                all_lane_states_mask[
+                    collected_lane_seqs, : min(len(state), self.max_num_nodes)
+                ] = 1
+                all_lane_ids.append(curr_lane_ids)
+                all_lane_ids_raw.append(curr_lane_ids_raw)
+                collected_lane_seqs += 1
+
+        # remove duplicated lane seq
+        filter_index = self.remove_duplicated_lane_seqs(exists_lane_seqs)
+        for idx, filter_idx in enumerate(filter_index):
+            all_lane_states[idx] = all_lane_states[filter_idx]
+            all_lane_states_mask[idx] = all_lane_states_mask[filter_idx]
+            all_lane_ids[idx] = all_lane_ids[filter_idx]
+            all_lane_ids_raw[idx] = all_lane_ids_raw[filter_idx]
+        all_lane_states[len(filter_index) :] = 0.0
+        all_lane_states_mask[len(filter_index) :] = 0.0
+        all_lane_ids = all_lane_ids[: len(filter_index)]
+        all_lane_ids_raw = all_lane_ids_raw[: len(filter_index)]
+
         if self.shuffle:
             random_idxs = np.arange(len(all_lane_ids))
             shuffle(random_idxs)
