@@ -31,7 +31,7 @@ def trigger_dag_warper(pre_task_name, base_data_root, condition_data_root, json_
           mpiexec --allow-run-as-root -np 12 python mpi_process.py --base_data_root {base_data_root}  --condition_data_root {condition_data_root} --json_file {json_file} --save_root {save_root} --cfg_file {cfg_file}
     """
 
-    dag_id = "gt_produce"
+    dag_id = "rspnp_nnpath"
     endpoint = "airflow-robocloud.robosense.cn"  # 正式集群
     user = "operator"
     password = "operator"

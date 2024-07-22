@@ -12,6 +12,7 @@ from tag_functions.path_risk import *
 from tag_functions.map_risk import *
 from tag_functions.condition_risk import *
 from tag_functions.ego_state import *
+from tag_functions.future_path_tag import *
 from base import ConditionRes, LabelScene, TagData
 from registry import TAG_FUNCTIONS
 
