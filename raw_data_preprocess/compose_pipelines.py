@@ -65,6 +65,9 @@ compose_pipelines = [
             "TIDAL",
             "BUS",
             "UNCONV",
+            "WAIT_LEFT",
+            "WAIT_RIGHT",
+            "WAIT_FORWARD",
         ],
         turn_type_mapping={
             "UNKNOWN_LANEDIRECTION": 0,
