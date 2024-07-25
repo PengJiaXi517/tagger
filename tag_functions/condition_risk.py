@@ -56,7 +56,7 @@ def condition_risk_check(data: TagData, params: Dict) -> Dict:
             for s_ind, e_ind, _ in data.condition_res.lane_seq_pair
         ]
     ):
-        if data.label_scene.ego_path_info.in_junction_id[0] is not None:
+        if data.label_scene.ego_path_info.in_junction_id[0] is None:
             condition_risk_tag.cond_no_entry_b_not_in_junction = True
 
     # Check if cond entry and exit
