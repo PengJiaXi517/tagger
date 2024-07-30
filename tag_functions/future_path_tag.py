@@ -1,6 +1,6 @@
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Dict, List
+from typing import Dict, List, Tuple
 
 import numpy as np
 from shapely.geometry import LineString, Point
@@ -155,8 +155,27 @@ class FuturePATHType(Enum):
 
 
 @dataclass(repr=False)
+class BasicPathTag:
+    valid_path_len: float = 0.0
+    sum_path_curvature: float = 0.0
+    abs_sum_path_curvature: float = 0.0
+    pos_sum_path_curvature: float = 0.0
+    neg_sum_path_curvature: float = 0.0
+
+    def as_dict(self):
+        return {
+            "valid_path_len": self.valid_path_len,
+            "sum_path_curvature": self.sum_path_curvature,
+            "abs_sum_path_curvature": self.abs_sum_path_curvature,
+            "pos_sum_path_curvature": self.pos_sum_path_curvature,
+            "neg_sum_path_curvature": self.neg_sum_path_curvature,
+        }
+
+
+@dataclass(repr=False)
 class FuturePathTag:
     path_type: FuturePATHType = FuturePATHType.UNKNOWN
+    basic_path_tag: BasicPathTag = None
     cruise_path_tag: List[CruisePATHTag] = None
     lc_path_tag: List[LcPATHTag] = None
     junction_path_tag: JunctionPATHTag = None
@@ -166,6 +185,11 @@ class FuturePathTag:
     def as_dict(self):
         return {
             "path_type": self.path_type.name,
+            "basic_path_tag": (
+                self.basic_path_tag.as_dict()
+                if self.basic_path_tag is not None
+                else None
+            ),
             "cruise_path_tag": (
                 [tag.as_dict() for tag in self.cruise_path_tag]
                 if self.cruise_path_tag is not None
@@ -537,6 +561,56 @@ def judge_path_type(data: TagData, params: Dict) -> FuturePATHType:
         )
 
 
+def normal_angle(theta):
+    while theta >= np.pi:
+        theta -= 2 * np.pi
+    while theta <= -np.pi:
+        theta += 2 * np.pi
+    return theta
+
+
+applyall = np.vectorize(normal_angle)
+
+
+def label_basic_tag(data: TagData, params: Dict) -> BasicPathTag:
+    def cal_curvature(future_path: List[Tuple[float, float]]) -> Tuple[float, ...]:
+        if len(future_path) <= 4:
+            return 0.0, 0.0, 0.0, 0.0
+        path_points = np.array(future_path)
+
+        diff_points = path_points[1:] - path_points[:-1]
+
+        theta = np.arctan2(diff_points[:, 1], diff_points[:, 0])
+
+        theta_diff = theta[1:] - theta[:-1]
+
+        length = np.linalg.norm(diff_points[:-1], axis=-1)
+
+        theta_diff = applyall(theta_diff)
+
+        curvature = theta_diff / length
+
+        return (
+            np.abs(curvature).sum(),
+            curvature[curvature > 0.0].sum(),
+            curvature[curvature < 0.0].sum(),
+            curvature.sum(),
+        )
+
+    abs_curvature, pos_curvature, neg_curvature, sum_curvature = cal_curvature(
+        data.label_scene.ego_path_info.future_path
+    )
+
+    basic_path_tag = BasicPathTag()
+    basic_path_tag.valid_path_len = len(data.label_scene.ego_path_info.future_path)
+    basic_path_tag.sum_path_curvature = sum_curvature
+    basic_path_tag.abs_sum_path_curvature = abs_curvature
+    basic_path_tag.pos_sum_path_curvature = pos_curvature
+    basic_path_tag.neg_sum_path_curvature = neg_curvature
+
+    return basic_path_tag
+
+
 @TAG_FUNCTIONS.register()
 def future_path_tag(data: TagData, params: Dict) -> Dict:
     future_path_tag = FuturePathTag()
@@ -548,6 +622,9 @@ def future_path_tag(data: TagData, params: Dict) -> Dict:
         always_on_current_lane_seq,
         arrive_on_nearby_lane_seq,
     ) = judge_path_type(data, params)
+
+    future_path_tag.basic_path_tag = label_basic_tag(data, params)
+
     if future_path_tag.path_type in [
         FuturePATHType.CRUISE,
         FuturePATHType.CROSS_JUNCTION_CRUISE,
