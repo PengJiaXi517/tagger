@@ -20,7 +20,6 @@ class ConditionRes:
                     "ego_per_lane_seq_path_mask"
                 ],
             }
-            print(condition_res)
         else:
             with open(file_path_or_file, "rb") as f:
                 condition_res = pickle.load(f)
