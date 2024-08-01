@@ -7,9 +7,22 @@ from shapely.geometry import LineString
 
 
 class ConditionRes:
-    def __init__(self, file_path: os.PathLike) -> None:
-        with open(file_path, "rb") as f:
-            condition_res = pickle.load(f)
+    def __init__(self, file_path_or_file: Union[os.PathLike, Dict]) -> None:
+        if isinstance(file_path_or_file, dict):
+            label = file_path_or_file
+            condition_res = {
+                "file_path": label["file_path"],
+                "seq_lane_ids": label["map_state"]["seq_lane_ids"],
+                "seq_lane_ids_raw": label["map_state"]["seq_lane_ids_raw"],
+                "start_lane_seqs_ind": label["obstacle_state"]["start_lane_seqs_ind"],
+                "end_lane_seqs_ind": label["obstacle_state"]["end_lane_seqs_ind"],
+                "ego_per_lane_seq_path_mask": label["obstacle_state"][
+                    "ego_per_lane_seq_path_mask"
+                ],
+            }
+        else:
+            with open(file_path_or_file, "rb") as f:
+                condition_res = pickle.load(f)
 
         self.file_path = condition_res["file_path"]
         self.seq_lane_ids: List[Set[int]] = condition_res["seq_lane_ids"]
@@ -133,8 +146,16 @@ class LabelScene:
             label["obstacles"][-9]["junction_info"], self.percepmap
         )
 
+        from raw_data_preprocess.compose_pipelines import compose_pipelines
+
+        for pipe in compose_pipelines:
+            label["file_path"] = label_path
+            pipe_res = pipe(label)
+
+        self.label_res = pipe_res
+
 
 class TagData:
     def __init__(self, label_path: os.PathLike, condition_path: os.PathLike) -> None:
         self.label_scene: LabelScene = LabelScene(label_path)
-        self.condition_res: ConditionRes = ConditionRes(condition_path)
+        self.condition_res: ConditionRes = ConditionRes(self.label_scene.label_res)

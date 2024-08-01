@@ -116,6 +116,19 @@ def process_master(
     ) as f:
         json.dump(allinall, f, indent=4)
 
+    with open(json_file, "r") as f:
+        ori_files = json.load(f)
+    collect_root = os.path.join(save_data_root, ori_files[0].split('/')[0])
+    output = {}
+    for sub_dir in os.listdir(collect_root):
+        label_root = os.path.join(collect_root, sub_dir, 'labels')
+        if os.path.exists(label_root):
+            for label_name in os.listdir(label_root):
+                with open(os.path.join(label_root, label_name), 'r') as f:
+                    output[label_name.split('.')[0]] = json.load(f)
+    with open(os.path.join(collect_root, 'tag.json'), 'w') as f:
+        json.dump(output, f)
+
     end = datetime.datetime.now()
     logger.success(f"Time: {end - begin} | Error num: {len(allerror)}")
 
