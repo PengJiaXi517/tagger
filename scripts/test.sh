@@ -1,0 +1,1 @@
+python ./scripts/check_caution_aera_clips.py -lon 121.58974862125837 -lat 31.218359233882435 -s ./test_jsons/zhuangzhuzi -pt /mnt/train2/eric.wang/path_tag_res/0801/ -lr /mnt/train2/pnd_data/PnPEnd2EndTrainData/pnd_label_result/base_label
