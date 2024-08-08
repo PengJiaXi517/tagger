@@ -20,6 +20,22 @@ def draw_tag_lines(
         y += lineHeight
 
 
+def get_basic_path_tag_lines(
+    tag: Dict,
+) -> Tuple[List[str], List[Tuple[float, float, float]]]:
+
+    lines = [
+        f"valid_path_len: {tag['valid_path_len']}",
+        f"sum_path_curvature: {tag['sum_path_curvature']}",
+        f"abs_sum_path_curvature: {tag['abs_sum_path_curvature']}",
+        f"pos_sum_path_curvature: {tag['pos_sum_path_curvature']}",
+        f"neg_sum_path_curvature: {tag['neg_sum_path_curvature']}",
+    ]
+    colors = [(255, 255, 255) for _ in range(5)]
+
+    return lines, colors
+
+
 def get_cruise_tag_lines(
     tags: List[Dict],
 ) -> Tuple[List[str], List[Tuple[float, float, float]]]:
