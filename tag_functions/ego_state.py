@@ -75,6 +75,9 @@ def ego_state_location(data, params):
     output['ego_state_location']["ego_after_juction"] = after_juction
     output['ego_state_location']["ego_in_road"] = in_road
 
+    ego_lla = label_scene.label_res.get('frame_info', {}).get('ego_lla', [])
+    output['ego_state_location']["lla"] = ego_lla
+
     return output
 
 
@@ -91,6 +94,27 @@ def ego_state_speed(data, params):
     output['ego_state_speed']["ego_speed_odom_x"] = speed_odom_x
     output['ego_state_speed']["ego_speed_odom_y"] = speed_odom_y
 
+    obstacles = label_scene.obstacles
+    if len(obstacles[-9]['features']['history_states']) > 1 and len(obstacles[-9]['future_trajectory']['future_states']) > 0:
+        cur_state = obstacles[-9]['features']['history_states'][-1]
+        pre_state = obstacles[-9]['features']['history_states'][-2]
+        next_state = obstacles[-9]['future_trajectory']['future_states'][0]
+
+        cur_x, cur_y, cur_t = cur_state['x'], cur_state['y'], cur_state['timestamp']
+        pre_x, pre_y, pre_t = pre_state['x'], pre_state['y'], pre_state['timestamp']
+        next_x, next_y, next_t = next_state['x'], next_state['y'], next_state['timestamp']
+
+        cur_x_v = (cur_x - pre_x) / ((cur_t - pre_t) / 10e5)
+        cur_y_v = (cur_y - pre_y) / ((cur_t - pre_t) / 10e5)
+
+        next_x_v = (next_x - cur_x) / ((next_t - cur_t) / 10e5)
+        next_y_v = (next_y - cur_y) / ((next_t - cur_t) / 10e5)
+
+        cur_x_acc = (next_x_v - cur_x_v) / ((next_t - cur_t) / 10e5)
+        cur_y_acc = (next_y_v - cur_y_v) / ((next_t - cur_t) / 10e5)
+        output['ego_state_speed']["ego_acc_odom_x"] = cur_x_acc
+        output['ego_state_speed']["ego_acc_odom_y"] = cur_y_acc
+
     return output
 
 
@@ -105,11 +129,14 @@ def ego_state_map_environment(data, params):
     ego_range_nearest_intersection_entry_lane_nums = 0
     ego_range_nearest_intersection_exist_lane_dir_vector = []
     ego_range_nearest_intersection_entry_lane_dir_vector = []
+    ego_range_percep_map_loc = {}
 
     ego_range_has_m2n = False
 
     condition_res = data.condition_res
     label_scene = data.label_scene
+
+    ego_range_percep_map_loc = label_scene.label_res.get('frame_info', {}).get('percep_map_loc', {})
 
     ego_range_num_lanes = len(condition_res.seq_lane_ids_raw)
 
@@ -180,6 +207,7 @@ def ego_state_map_environment(data, params):
     ] = ego_range_nearest_intersection_entry_lane_dir_vector
     output['ego_state_map_environment']["ego_range_has_m2n"] = ego_range_has_m2n
     output['ego_state_map_environment']["ego_range_num_lanes"] = ego_range_num_lanes
+    output['ego_state_map_environment']["ego_range_percep_map_loc"] = ego_range_percep_map_loc
 
     return output
 
