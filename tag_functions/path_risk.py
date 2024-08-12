@@ -5,7 +5,6 @@ from shapely import geometry
 
 from registry import TAG_FUNCTIONS
 
-VALID_PATH_NUM = 100
 
 @TAG_FUNCTIONS.register()
 def path_risk(data, params):
@@ -20,7 +19,7 @@ def path_risk(data, params):
 
     lane_seq_pair = condition_res.lane_seq_pair
     for item in lane_seq_pair:
-        if item[-1].sum() < VALID_PATH_NUM:
+        if item[-1].sum() < params["valid_path_num"]:
             tag_ego_path_valid_length_risk = True
 
     future_path = label_scene.ego_path_info.future_path
