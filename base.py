@@ -162,6 +162,8 @@ class LabelScene:
 
         from raw_data_preprocess.compose_pipelines import compose_pipelines
 
+        compose_pipelines[-1].max_path_sample_points = max_valid_point_num
+
         for pipe in compose_pipelines:
             label["file_path"] = label_path
             pipe_res = pipe(label)
