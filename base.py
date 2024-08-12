@@ -1,6 +1,6 @@
+import io
 import os
 import pickle
-import io
 from typing import Dict, List, Set, Tuple, Union
 
 import numpy as np
@@ -133,18 +133,24 @@ class JunctionLabelInfo:
 
 
 class LabelScene:
-    def __init__(self, label_path: os.PathLike, s3_client) -> None:
-        if 's3://' not in label_path:
+    def __init__(
+        self, label_path: os.PathLike, s3_client, max_valid_point_num: int = 34
+    ) -> None:
+        if "s3://" not in label_path:
             with open(label_path, "rb") as f:
                 label = pickle.load(f)
         else:
             file_obj = io.BytesIO()
-            s3_client.download_fileobj("pnd", label_path.split('s3://pnd/')[1], file_obj)
+            s3_client.download_fileobj(
+                "pnd", label_path.split("s3://pnd/")[1], file_obj
+            )
             file_obj.seek(0)
             label = pickle.load(file_obj)
             file_obj.close()
 
-        self.ego_path_info: EgoPathInfo = EgoPathInfo(label["ego_path_info"])
+        self.ego_path_info: EgoPathInfo = EgoPathInfo(
+            label["ego_path_info"], max_valid_point_num
+        )
         self.percepmap: Dict = PercepMap(label["percepmap"])
         self.obstacles: Dict = label["obstacles"]
         self.ego_obs_lane_seq_info = EgoObstacleLaneSeqInfo(
@@ -164,6 +170,14 @@ class LabelScene:
 
 
 class TagData:
-    def __init__(self, label_path: os.PathLike, condition_path: os.PathLike, s3_client) -> None:
-        self.label_scene: LabelScene = LabelScene(label_path, s3_client)
+    def __init__(
+        self,
+        label_path: os.PathLike,
+        condition_path: os.PathLike,
+        s3_client,
+        max_valid_point_num: int = 34,
+    ) -> None:
+        self.label_scene: LabelScene = LabelScene(
+            label_path, s3_client, max_valid_point_num
+        )
         self.condition_res: ConditionRes = ConditionRes(self.label_scene.label_res)

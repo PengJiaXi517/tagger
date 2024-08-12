@@ -3,9 +3,9 @@ import json
 import os
 import os.path as osp
 import pickle
-import boto3
 import random
 
+import boto3
 import numpy as np
 from tqdm import tqdm
 
@@ -23,26 +23,36 @@ from utils.config import Config
 class TagParse:
     def __init__(self, cfg_file):
         self.cfg = Config.fromfile(cfg_file)
-        self.s3_client = boto3.client("s3",
-                                 endpoint_url=f"http://10.199.199.{random.randint(81, 88)}:8082/",
-                                 aws_access_key_id="UI2WLBBFHV1CE0HZMZG2",
-                                 aws_secret_access_key="sA2ozSrzC1lehJLbB4AuGCwiuLCHVLOcUbn16xiM",
-                                 verify=False,
-                                 use_ssl=False)
+        self.max_valid_point_num = self.cfg.get("max_valid_point_num", 34)
+        self.s3_client = boto3.client(
+            "s3",
+            endpoint_url=f"http://10.199.199.{random.randint(81, 88)}:8082/",
+            aws_access_key_id="UI2WLBBFHV1CE0HZMZG2",
+            aws_secret_access_key="sA2ozSrzC1lehJLbB4AuGCwiuLCHVLOcUbn16xiM",
+            verify=False,
+            use_ssl=False,
+        )
 
     def read_data(self, base_data_root, condition_data_root, pickle_sub_path):
         base_pickle_path = osp.join(base_data_root, pickle_sub_path)
         condition_pickle_path = osp.join(
             condition_data_root, pickle_sub_path.replace(".pickle", "ego_path.pickle")
         )
-        self.tag_data = TagData(base_pickle_path, condition_pickle_path, self.s3_client)
+        self.tag_data = TagData(
+            base_pickle_path,
+            condition_pickle_path,
+            self.s3_client,
+            self.max_valid_point_num,
+        )
 
     def process(
         self, base_data_root, condition_data_root, save_data_root, pickle_sub_path
     ):
         self.read_data(base_data_root, condition_data_root, pickle_sub_path)
-        self.tag_result = {'data_root': base_data_root,
-                           'file_path': pickle_sub_path,}
+        self.tag_result = {
+            "data_root": base_data_root,
+            "file_path": pickle_sub_path,
+        }
         for k, v in self.cfg.get("tag_pipelines", {}).items():
             sub_tag_res = TAG_FUNCTIONS.get(k)(self.tag_data, v)
             assert type(sub_tag_res) is dict
@@ -55,7 +65,10 @@ class TagParse:
             osp.join(save_data_root, "/".join(pickle_sub_path.split("/")[:-1])),
             exist_ok=True,
         )
-        with open(os.path.join(save_data_root, pickle_sub_path.replace('.pickle', '.json')), "w") as f:
+        with open(
+            os.path.join(save_data_root, pickle_sub_path.replace(".pickle", ".json")),
+            "w",
+        ) as f:
             json.dump(self.tag_result, f, indent=4)
 
 
