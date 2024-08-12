@@ -219,6 +219,7 @@ def label_cruise_tag(
     params: Dict,
     always_on_current_lane_seq,
     percep_map: PercepMap,
+    sample_point_length: float = 3.0,
 ) -> List[CruisePATHTag]:
     ego_path_info = data.label_scene.ego_path_info
     num_points_on_lane = 0
@@ -241,7 +242,7 @@ def label_cruise_tag(
 
         cruise_tag.labeled_lane_seq = lane_seq
         cruise_tag.max_continuous_length_on_lane = max(
-            (num_points_on_lane - 1) * 3.0, 0.0
+            (num_points_on_lane - 1) * sample_point_length, 0.0
         )
 
         polylines = [
@@ -272,6 +273,7 @@ def label_lc_tag(
     params: Dict,
     arrive_on_nearby_lane_seq,
     percep_map: PercepMap,
+    sample_point_length: float = 3.0,
 ) -> LcPATHTag:
     ego_path_info = data.label_scene.ego_path_info
     num_points_on_lane = 0
@@ -309,7 +311,7 @@ def label_lc_tag(
         lc_path_tag.labeled_lane_seq = lane_seq
         lc_path_tag.arrive_length = (
             num_points_on_lane - first_arrive_lane_seq_idx
-        ) * 3.0
+        ) * sample_point_length
 
         start_point = Point(path_line_string.coords[0])
 
@@ -344,7 +346,7 @@ JUNCTION_GOAL_2_TURN_TYPE = {
 
 
 def label_junction_tag(
-    data: TagData, params: Dict, percep_map: PercepMap
+    data: TagData, params: Dict, percep_map: PercepMap, sample_point_length: float = 3.0
 ) -> JunctionPATHTag:
     junction_path_tag = JunctionPATHTag()
 
@@ -446,9 +448,9 @@ def label_junction_tag(
                         corr_real_lane = True
                         break
                 if corr_real_lane:
-                    max_length_in_exit_lane += 3.0
+                    max_length_in_exit_lane += sample_point_length
                 else:
-                    max_length_not_in_exit_lane += 3.0
+                    max_length_not_in_exit_lane += sample_point_length
 
             junction_path_tag.max_length_in_exit_lane = max_length_in_exit_lane
             junction_path_tag.max_length_not_in_exit_lane = max_length_not_in_exit_lane
@@ -634,6 +636,7 @@ def future_path_tag(data: TagData, params: Dict) -> Dict:
             params,
             always_on_current_lane_seq,
             percep_map,
+            params["sample_point_length"],
         )
 
     elif future_path_tag.path_type in [
@@ -641,7 +644,11 @@ def future_path_tag(data: TagData, params: Dict) -> Dict:
         FuturePATHType.CROSS_JUNCTION_LC,
     ]:
         future_path_tag.lc_path_tag = label_lc_tag(
-            data, params, arrive_on_nearby_lane_seq, percep_map
+            data,
+            params,
+            arrive_on_nearby_lane_seq,
+            percep_map,
+            params["sample_point_length"],
         )
 
     if future_path_tag.path_type in [
@@ -649,7 +656,12 @@ def future_path_tag(data: TagData, params: Dict) -> Dict:
         FuturePATHType.CROSS_JUNCTION_LC,
         FuturePATHType.CROSS_JUNCTION_UNKNWON,
     ]:
-        future_path_tag.junction_path_tag = label_junction_tag(data, params, percep_map)
+        future_path_tag.junction_path_tag = label_junction_tag(
+            data,
+            params,
+            percep_map,
+            params["sample_point_length"],
+        )
 
     future_path_tag.condition_res_tag = label_condition_res_tag(data, params)
 

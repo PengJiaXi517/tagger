@@ -19,13 +19,12 @@ def draw_map(
         view.draw_polyline(
             frame, polygon[:, 0], polygon[:, 1], color=(0, 255, 255), thickness=3
         )
-        break
 
     for curb in percep_map["curbs"]:
         if len(curb) > 0:
             curb = np.array(curb)
             view.draw_polyline(
-                frame, curb[:, 0], curb[:, 1], color=(0, 0, 255), thickness=2
+                frame, curb[:, 0], curb[:, 1], color=(0, 255, 255), thickness=2
             )
 
     start_lane_ids_set = []
