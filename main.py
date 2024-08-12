@@ -3,6 +3,8 @@ import json
 import os
 import os.path as osp
 import pickle
+import boto3
+import random
 
 import numpy as np
 from tqdm import tqdm
@@ -21,13 +23,19 @@ from utils.config import Config
 class TagParse:
     def __init__(self, cfg_file):
         self.cfg = Config.fromfile(cfg_file)
+        self.s3_client = boto3.client("s3",
+                                 endpoint_url=f"http://10.199.199.{random.randint(81, 88)}:8082/",
+                                 aws_access_key_id="UI2WLBBFHV1CE0HZMZG2",
+                                 aws_secret_access_key="sA2ozSrzC1lehJLbB4AuGCwiuLCHVLOcUbn16xiM",
+                                 verify=False,
+                                 use_ssl=False)
 
     def read_data(self, base_data_root, condition_data_root, pickle_sub_path):
         base_pickle_path = osp.join(base_data_root, pickle_sub_path)
         condition_pickle_path = osp.join(
             condition_data_root, pickle_sub_path.replace(".pickle", "ego_path.pickle")
         )
-        self.tag_data = TagData(base_pickle_path, condition_pickle_path)
+        self.tag_data = TagData(base_pickle_path, condition_pickle_path, self.s3_client)
 
     def process(
         self, base_data_root, condition_data_root, save_data_root, pickle_sub_path
@@ -52,19 +60,35 @@ class TagParse:
 
 
 if __name__ == "__main__":
-    base_data_root = "/mnt/train2/pnd_data/PnPBaseTrainDataTmp/road_percep_demoroad_overfit"
+    # base_data_root = "/mnt/train2/pnd_data/PnPEnd2EndTrainData/pnd_label_result/base_label"
+    # condition_data_root = (
+    #     "/mnt/train2/RoadPercep/eric.wang/tmp_data/0704_ego_path_parse/"
+    # )
+    # json_file = "/mnt/train2/pnd_data/PnPEnd2EndTrainData/pnd_label_result/TripPathData/output/0726_increase/bug_fix_output/train/train.json"
+    # save_root = "/mnt/train2/RoadPercep/eric.wang/path_tag/test"
+    # cfg_file = (
+    #     "/mnt/train2/RoadPercep/eric.wang/Code/path-nn-tagger/cfg/config.risk.py"
+    # )
+    #
+    # with open(json_file, "r") as f:
+    #     json_list = json.load(f)
+    #
+    # tag_parse = TagParse(cfg_file)
+    # tag_parse.process(base_data_root, condition_data_root, save_root, '52918_16164_Guangqi-003_jinshengye_2024-07-16-20-10-05/52918_16164_Guangqi-003_jinshengye_2024-07-16-20-10-05_10_19/labels/1721132125291139.pickle')
+    # for json_line in tqdm(json_list):
+    #     tag_parse.process(base_data_root, condition_data_root, save_root, json_line)
+
+
+    base_data_root = "s3://pnd/PnPBaseTrainData/base_label_v2.0.4"
     condition_data_root = (
         "/mnt/train2/RoadPercep/eric.wang/tmp_data/0704_ego_path_parse/"
     )
-    json_file = "/mnt/train2/RoadPercep/eric.wang/path_tag_logs/0711/part_0.json"
+    json_file = "/mnt/train2/pnd_data/PnPEnd2EndTrainData/pnd_label_result/TripPathData/output/0726_increase/bug_fix_output/train/train.json"
     save_root = "/mnt/train2/RoadPercep/eric.wang/path_tag/test"
     cfg_file = (
         "/mnt/train2/RoadPercep/eric.wang/Code/path-nn-tagger/cfg/config.risk.py"
     )
 
-    with open(json_file, "r") as f:
-        json_list = json.load(f)
-
     tag_parse = TagParse(cfg_file)
-    for json_line in tqdm(json_list):
-        tag_parse.process(base_data_root, condition_data_root, save_root, json_line)
+    tag_parse.process(base_data_root, condition_data_root, save_root,
+                      '50101_50026_BYD-001_qiwu_2024-07-03-06-50-36/50101_50026_BYD-001_qiwu_2024-07-03-06-50-36_0_9/labels/1719960640990232.pickle')
