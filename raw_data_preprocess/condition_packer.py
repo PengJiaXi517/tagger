@@ -71,7 +71,7 @@ class EgoPathPacker2LaneSeq:
         ),
         lane_seq_num: int = 48,
         sample_distance: float = 3.0,
-        max_path_sample_points: int = 34,
+        max_path_sample_points: int = 100,
         max_vt_profile_sample_point: int = 50,
         max_start_lane_seq_num: int = 4,
         max_end_lane_seq_num: int = 4,
