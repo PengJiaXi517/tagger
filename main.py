@@ -58,7 +58,8 @@ class TagParse:
             assert type(sub_tag_res) is dict
             assert len(sub_tag_res.keys() & self.tag_result.keys()) == 0
             self.tag_result.update(sub_tag_res)
-        self.save_data(save_data_root, pickle_sub_path)
+        # self.save_data(save_data_root, pickle_sub_path)
+        return self.tag_result
 
     def save_data(self, save_data_root, pickle_sub_path):
         os.makedirs(
@@ -104,4 +105,4 @@ if __name__ == "__main__":
 
     tag_parse = TagParse(cfg_file)
     tag_parse.process(base_data_root, condition_data_root, save_root,
-                      '50101_50026_BYD-001_qiwu_2024-07-03-06-50-36/50101_50026_BYD-001_qiwu_2024-07-03-06-50-36_0_9/labels/1719960640990232.pickle')
+                      '50819_246_WeiLai-007_youzhao_2024-07-10-07-02-50/50819_246_WeiLai-007_youzhao_2024-07-10-07-02-50_60_69/labels/1720568065992249.pickle')
