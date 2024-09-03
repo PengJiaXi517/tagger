@@ -236,9 +236,4 @@ def interactive_tag(data: TagData, params: Dict) -> Dict:
         elif obs_lat != 0:
             fill_lat_interact_tag(ret, obs_state, obs_decision, obs_lat)
 
-    print(
-        ret.veh_lon_interact_tag.has_follow,
-        ret.veh_lon_interact_tag.has_yield,
-        ret.veh_lon_interact_tag.has_overtake,
-    )
     return ret.as_dict()
