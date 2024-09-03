@@ -11,6 +11,7 @@ tag_pipelines = {
     "future_path_tag": {
         "sample_point_length": 1.0,
     },
+    "interactive_tag": {},
 }
 
 max_valid_point_num = 100
