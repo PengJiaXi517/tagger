@@ -3,6 +3,7 @@ import os
 import numpy as np
 from shapely import geometry
 
+from utils.trans import trans_odom2ego
 from registry import TAG_FUNCTIONS
 
 
@@ -75,6 +76,9 @@ def ego_state_location(data, params):
     output['ego_state_location']["ego_after_juction"] = after_juction
     output['ego_state_location']["ego_in_road"] = in_road
 
+    ego_lla = label_scene.label_res.get('frame_info', {}).get('ego_lla', [])
+    output['ego_state_location']["lla"] = ego_lla
+
     return output
 
 
@@ -90,6 +94,32 @@ def ego_state_speed(data, params):
 
     output['ego_state_speed']["ego_speed_odom_x"] = speed_odom_x
     output['ego_state_speed']["ego_speed_odom_y"] = speed_odom_y
+    if len(label_scene.obstacles[-9]['future_trajectory']['future_states']) > 51:
+        future_states = label_scene.obstacles[-9]['future_trajectory']['future_states']
+        start_v = np.sqrt(future_states[0]['vx'] ** 2 + future_states[0]['vy'] ** 2)
+        end_v = np.sqrt(future_states[50]['vx'] ** 2 + future_states[50]['vy'] ** 2)
+        output['ego_state_speed']["ego_speed_5s_acc"] = (end_v - start_v) / 5.0
+
+    obstacles = label_scene.obstacles
+    if len(obstacles[-9]['features']['history_states']) > 1 and len(obstacles[-9]['future_trajectory']['future_states']) > 0:
+        cur_state = obstacles[-9]['features']['history_states'][-1]
+        pre_state = obstacles[-9]['features']['history_states'][-2]
+        next_state = obstacles[-9]['future_trajectory']['future_states'][0]
+
+        cur_x, cur_y, cur_t = cur_state['x'], cur_state['y'], cur_state['timestamp']
+        pre_x, pre_y, pre_t = pre_state['x'], pre_state['y'], pre_state['timestamp']
+        next_x, next_y, next_t = next_state['x'], next_state['y'], next_state['timestamp']
+
+        cur_x_v = (cur_x - pre_x) / ((cur_t - pre_t) / 10e5)
+        cur_y_v = (cur_y - pre_y) / ((cur_t - pre_t) / 10e5)
+
+        next_x_v = (next_x - cur_x) / ((next_t - cur_t) / 10e5)
+        next_y_v = (next_y - cur_y) / ((next_t - cur_t) / 10e5)
+
+        cur_x_acc = (next_x_v - cur_x_v) / ((next_t - cur_t) / 10e5)
+        cur_y_acc = (next_y_v - cur_y_v) / ((next_t - cur_t) / 10e5)
+        output['ego_state_speed']["ego_acc_odom_x"] = cur_x_acc
+        output['ego_state_speed']["ego_acc_odom_y"] = cur_y_acc
 
     return output
 
@@ -105,11 +135,14 @@ def ego_state_map_environment(data, params):
     ego_range_nearest_intersection_entry_lane_nums = 0
     ego_range_nearest_intersection_exist_lane_dir_vector = []
     ego_range_nearest_intersection_entry_lane_dir_vector = []
+    ego_range_percep_map_loc = {}
 
     ego_range_has_m2n = False
 
     condition_res = data.condition_res
     label_scene = data.label_scene
+
+    ego_range_percep_map_loc = label_scene.label_res.get('frame_info', {}).get('percep_map_loc', {})
 
     ego_range_num_lanes = len(condition_res.seq_lane_ids_raw)
 
@@ -180,6 +213,40 @@ def ego_state_map_environment(data, params):
     ] = ego_range_nearest_intersection_entry_lane_dir_vector
     output['ego_state_map_environment']["ego_range_has_m2n"] = ego_range_has_m2n
     output['ego_state_map_environment']["ego_range_num_lanes"] = ego_range_num_lanes
+    output['ego_state_map_environment']["ego_range_percep_map_loc"] = ego_range_percep_map_loc
+
+    return output
+
+
+@TAG_FUNCTIONS.register()
+def ego_state_occ_environment(data, params):
+
+    output = {'ego_state_occ_environment': {}}
+
+    ego_state_intersect_occ = False
+    ego_state_nearest_occ_dis = 9999.0
+
+    condition_res = data.condition_res
+    label_scene = data.label_scene
+
+    future_path = label_scene.ego_path_info.future_path
+    occ_obstacles = label_scene.label_res['occ_obstacles']
+
+    future_path = geometry.LineString(future_path)
+    for k, v in occ_obstacles.items():
+        polygon_points = v['polygon_points']
+        polygon = geometry.Polygon(polygon_points)
+        if future_path.intersects(polygon):
+            ego_state_intersect_occ = True
+            ego_state_nearest_occ_dis = 0
+            break
+        else:
+            polygon_dis = future_path.distance(polygon)
+            if polygon_dis < ego_state_intersect_occ:
+                ego_state_nearest_occ_dis = polygon_dis
+
+    output['ego_state_occ_environment']['ego_state_intersect_occ'] = ego_state_intersect_occ
+    output['ego_state_occ_environment']['ego_state_nearest_occ_dis'] = ego_state_nearest_occ_dis
 
     return output
 
@@ -197,6 +264,9 @@ def ego_state_obs_environment(data, params):
 
     future_path = label_scene.ego_path_info.future_path
     start_point = geometry.Point(future_path[0])
+
+    ego_state = label_scene.obstacles[-9]['features']['history_states'][-1]
+    odom_x, odom_y, odom_theta = ego_state['x'], ego_state['y'], ego_state['theta']
 
     for k, v in label_scene.obstacles.items():
         if k != -9:
@@ -216,4 +286,67 @@ def ego_state_obs_environment(data, params):
 
     output['ego_state_obs_environment']["ego_range_5m_obs_nums"] = ego_range_5m_obs_nums
     output['ego_state_obs_environment']["ego_range_5m_vehicle_nums"] = ego_range_5m_vehicle_nums
+
+    ego_range_polygon1 = geometry.Polygon([[-5, 10], [30, 10], [30, -10], [-5, -10], [-5, 10]])
+    ego_range_polygon2 = geometry.Polygon([[-5, 10], [50, 10], [50, -10], [-5, -10], [-5, 10]])
+    ego_range_polygon3 = geometry.Polygon([[-5, 10], [70, 10], [70, -10], [-5, -10], [-5, 10]])
+    ego_range_30m_vehicle_nums = 0
+    ego_range_50m_vehicle_nums = 0
+    ego_range_70m_vehicle_nums = 0
+    for k, v in label_scene.obstacles.items():
+        if k != -9:
+            if v["features"]["type"] == "VEHICLE":
+                obs_x = v["features"]["history_states"][-1]["x"]
+                obs_y = v["features"]["history_states"][-1]["y"]
+                obs_ego_loc = trans_odom2ego(odom_x, odom_y, odom_theta, np.array([obs_x, obs_y]))
+                obs_point = geometry.Point(obs_ego_loc)
+                if obs_point.intersects(ego_range_polygon1) or ego_range_polygon1.contains(obs_point):
+                    ego_range_30m_vehicle_nums += 1
+                if obs_point.intersects(ego_range_polygon2) or ego_range_polygon2.contains(obs_point):
+                    ego_range_50m_vehicle_nums += 1
+                if obs_point.intersects(ego_range_polygon3) or ego_range_polygon3.contains(obs_point):
+                    ego_range_70m_vehicle_nums += 1
+    output['ego_state_obs_environment']["ego_range_30m_vehicle_nums"] = ego_range_30m_vehicle_nums
+    output['ego_state_obs_environment']["ego_range_50m_vehicle_nums"] = ego_range_50m_vehicle_nums
+    output['ego_state_obs_environment']["ego_range_70m_vehicle_nums"] = ego_range_70m_vehicle_nums
+
+    ego_current_lanes = label_scene.obstacles[-9]['lane_graph']['current_lanes']
+    cipv_dis = 9999
+    cipv_vx = None
+    cipv_vy = None
+    if len(ego_current_lanes) != 0:
+        for k, v in label_scene.obstacles.items():
+            if k != -9:
+                if v["features"]["type"] == "VEHICLE":
+                    current_lanes = v['lane_graph']['current_lanes']
+                    for current_lane in current_lanes:
+                        if current_lane in ego_current_lanes:
+                            veh_odom_x, veh_odom_y = v['features']['history_states'][-1]['x'], v['features']['history_states'][-1]['y']
+                            dis = np.sqrt((veh_odom_x - odom_x) ** 2 + (veh_odom_y - odom_y) ** 2)
+                            if dis < cipv_dis:
+                                cipv_dis = dis
+                                cipv_vx = v['features']['history_states'][-1]['vx']
+                                cipv_vy = v['features']['history_states'][-1]['vy']
+
+    else:
+        future_path = geometry.LineString(future_path)
+        for k, v in label_scene.obstacles.items():
+            if k != -9:
+                if v["features"]["type"] == "VEHICLE":
+                    veh_odom_x, veh_odom_y = v['features']['history_states'][-1]['x'], \
+                                             v['features']['history_states'][-1]['y']
+
+                    veh_point = geometry.Point([veh_odom_x, veh_odom_y])
+                    if future_path.distance(veh_point) < 0.5:
+                        dis = np.sqrt((veh_odom_x - odom_x) ** 2 + (veh_odom_y - odom_y) ** 2)
+                        if dis < cipv_dis:
+                            cipv_dis = dis
+                            cipv_vx = v['features']['history_states'][-1]['vx']
+                            cipv_vy = v['features']['history_states'][-1]['vy']
+
+    output['ego_state_obs_environment']["cipv_dis"] = cipv_dis
+    output['ego_state_obs_environment']["cipv_vx"] = cipv_vx
+    output['ego_state_obs_environment']["cipv_vy"] = cipv_vy
+
+
     return output

@@ -73,6 +73,7 @@ class MapLaneSeqPacker:
         },
         save_lane_ids_raw: bool = True,
         filter_virtual: bool = True,
+        filter_pd_lane: bool = True,
         max_num_nodes: int = 128,
         max_num_lane_seqs: int = 64,
         x_range=(-50, 150),
@@ -92,6 +93,7 @@ class MapLaneSeqPacker:
 
         self.sample_interval = sample_interval
         self.filter_lane_type = filter_lane_type
+        self.filter_pd_lane = filter_pd_lane
         self.turn_type_mapping = turn_type_mapping
         self.lane_type_mapping = lane_type_mapping
         self.max_num_nodes = max_num_nodes
@@ -114,6 +116,9 @@ class MapLaneSeqPacker:
         res = (
             lane["left_boundary"]["is_virtual"] and lane["right_boundary"]["is_virtual"]
         )
+        if self.filter_pd_lane:
+            if not lane.get("pd_lane", True):
+                return True
         if lane.get("lane_category"):
             return res or lane["lane_category"] in (
                 "INTERSECTION_VIRTUAL",

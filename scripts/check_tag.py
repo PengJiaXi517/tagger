@@ -1,10 +1,13 @@
 import argparse
+import io
 import json
 import os
 import pickle
+import random
 from multiprocessing import Pool
 from typing import List
 
+import boto3
 import cv2
 import numpy as np
 from tqdm import tqdm
@@ -18,6 +21,15 @@ from utils.viz_utils.tag import (
     get_cruise_tag_lines,
     get_junction_tag_lines,
     get_lc_tag_lines,
+)
+
+s3_client = boto3.client(
+    "s3",
+    endpoint_url=f"http://10.199.199.{random.randint(81, 88)}:8082/",
+    aws_access_key_id="UI2WLBBFHV1CE0HZMZG2",
+    aws_secret_access_key="sA2ozSrzC1lehJLbB4AuGCwiuLCHVLOcUbn16xiM",
+    verify=False,
+    use_ssl=False,
 )
 
 
@@ -36,12 +48,27 @@ def process_file(
     ):
         pickle_file = file
         json_file = file.replace(".pickle", ".json")
-        if not os.path.exists(os.path.join(root_dir, pickle_file)):
-            continue
         with open(os.path.join(tag_path, json_file), "r") as f:
             tag = json.load(f)
-        with open(os.path.join(root_dir, pickle_file), "rb") as f:
-            label = pickle.load(f)
+        label_path = os.path.join(root_dir, pickle_file)
+        if "s3://" not in label_path:
+            if not os.path.exists(label_path):
+                continue
+            with open(label_path, "rb") as f:
+                label = pickle.load(f)
+        else:
+            try:
+                file_obj = io.BytesIO()
+                s3_client.download_fileobj(
+                    "pnd", label_path.split("s3://pnd/")[1], file_obj
+                )
+                file_obj.seek(0)
+                label = pickle.load(file_obj)
+                file_obj.close()
+            except Exception:
+                continue
+        # with open(os.path.join(root_dir, pickle_file), "rb") as f:
+        #     label = pickle.load(f)
 
         ego_path_info = label["ego_path_info"]
 
@@ -79,7 +106,7 @@ def process_file(
 
         draw_obstacle(label["obstacles"], ego_car_view, frame)
 
-        draw_ego_path(ego_path_info, ego_car_view, frame)
+        draw_ego_path(ego_path_info, ego_car_view, frame, max_length=100)
 
         bag, clip, _, ts_pickle = pickle_file.split("/")
         lines = [

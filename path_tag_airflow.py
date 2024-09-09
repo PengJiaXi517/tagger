@@ -31,7 +31,7 @@ def trigger_dag_warper(pre_task_name, base_data_root, condition_data_root, json_
           mpiexec --allow-run-as-root -np 12 python mpi_process.py --base_data_root {base_data_root}  --condition_data_root {condition_data_root} --json_file {json_file} --save_root {save_root} --cfg_file {cfg_file}
     """
 
-    dag_id = "gt_produce"
+    dag_id = "rspnp_nnpath"
     endpoint = "airflow-robocloud.robosense.cn"  # 正式集群
     user = "operator"
     password = "operator"
@@ -54,18 +54,25 @@ if __name__ == '__main__':
     with open(args.json_path, 'r') as f:
         json_list = json.load(f)
 
-    json_length = len(json_list) + 201
-    for i in range(args.split_num):
-        new_json = json_list[json_length // args.split_num * i: json_length // args.split_num * (i + 1)]
-        with open(os.path.join(args.split_json_path, 'part_{}.json'.format(i)), 'w') as f:
-            json.dump(new_json, f)
+    task_dic = {}
+    for item in json_list:
+        if item.split('/')[0] not in task_dic:
+            task_dic[item.split('/')[0]] = [item]
+        else:
+            task_dic[item.split('/')[0]].append(item)
+
+    for k, v in task_dic.items():
+        with open(os.path.join(args.split_json_path, '{}.json'.format(k)), 'w') as f:
+            json.dump(v, f)
 
 
     for i, json_path in enumerate(os.listdir(args.split_json_path)):
+        # if 'part' in json_path:
+        #     continue
         trigger_dag_warper(args.pre_task_name,
                             args.base_data_root,
                            args.condition_data_root,
-                           os.path.join(args.split_json_path, 'part_{}.json'.format(i)),
+                           os.path.join(args.split_json_path, json_path),
                            args.save_root,
                            args.cfg_file)
         # break
