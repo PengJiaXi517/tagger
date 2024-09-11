@@ -25,7 +25,7 @@ from utils.viz_utils.tag import (
 
 s3_client = boto3.client(
     "s3",
-    endpoint_url=f"http://10.199.199.{random.randint(81, 88)}:8082/",
+    endpoint_url=f"http://10.199.199.{random.randint(81, 96)}:8082/",
     aws_access_key_id="UI2WLBBFHV1CE0HZMZG2",
     aws_secret_access_key="sA2ozSrzC1lehJLbB4AuGCwiuLCHVLOcUbn16xiM",
     verify=False,
@@ -40,6 +40,7 @@ def process_file(
     root_dir="/mnt/train2/pnd_data/PnPEnd2EndTrainData/pnd_label_result/base_label",
     rank=0,
 ):
+    cache_tag = {}
     for file in tqdm(
         file_list,
         nrows=4,
@@ -48,8 +49,22 @@ def process_file(
     ):
         pickle_file = file
         json_file = file.replace(".pickle", ".json")
-        with open(os.path.join(tag_path, json_file), "r") as f:
-            tag = json.load(f)
+        tag_json = os.path.join(tag_path, json_file.split("/")[0], "tag.json")
+        if tag_json not in cache_tag:
+            with open(
+                os.path.join(tag_path, json_file.split("/")[0], "tag.json"), "r"
+            ) as f:
+                tags = json.load(f)
+            cache_tag[tag_json] = tags
+        tags = cache_tag[tag_json]
+        cache_tag = {}
+        # cache_tag = {}  # Tmp remove
+        ts_us = pickle_file.split("/")[-1].split(".pickle")[0]
+        if ts_us not in tags:
+            continue
+        tag = tags[ts_us]
+        # with open(os.path.join(tag_path, json_file), "r") as f:
+        #     tag = json.load(f)
         label_path = os.path.join(root_dir, pickle_file)
         if "s3://" not in label_path:
             if not os.path.exists(label_path):
@@ -218,18 +233,32 @@ if __name__ == "__main__":
     )
     args = parser.parse_args()
 
-    num_process = 20
+    num_process = 50
 
     json_file = args.frame_list
     save_path = args.save_path
     tag_root_path = args.tag_root_path
     label_root_path = args.label_root_path
 
+    os.makedirs(save_path, exist_ok=True)
+
     with open(json_file, "r") as f:
         file_list: List[str] = json.load(f)
 
+    # file_list = file_list[::100]
+    # print(len(file_list))
+    # process_file(file_list, save_path, tag_root_path, label_root_path, 0)
+    # exit(0)
+
     # process_file(file_list, "/mnt/train2/pnd_data/PersonalData/Ness.hu/WaiQieDataCheck")
     # file_list = file_list[:20000]
+    # process_file(file_list, save_path, tag_root_path, label_root_path)
+
+    # file_list = [
+    #     "63413_16760_WeiLai-011_hongbinwu_2024-08-23-06-49-21/63413_16760_WeiLai-011_hongbinwu_2024-08-23-06-49-21_150_159/labels/1724371483890853.pickle",
+    # ]
+    # process_file(file_list, save_path, tag_root_path, label_root_path)
+    # exit()
 
     with Pool(num_process) as pool:
         for i in range(num_process):
