@@ -5,6 +5,7 @@ import datetime
 import sys
 from loguru import logger
 import argparse
+from tqdm import tqdm
 
 from main import TagParse
 
@@ -47,6 +48,7 @@ def process_master(
 
     allinall = []
     allerror = []
+    all_tag_res = {}
 
     while len(file_stack) > 0 or any(i == "WORKING" for i in workers_status):
         for i_worker in range(1, world_size):
@@ -59,6 +61,7 @@ def process_master(
                         condition_data_root,
                         save_data_root,
                         file,
+                        # tag_parse
                     ],
                     dest=i_worker,
                 )
@@ -66,7 +69,7 @@ def process_master(
                 tasks_send += 1
         recv_data = world.recv(source=MPI.ANY_SOURCE)
         tasks_recv += 1
-        status, recv_line, world_rank = recv_data
+        status, recv_line, tag_res, world_rank = recv_data
         workers_status[world_rank] = "IDLE"
 
         if not status:
@@ -75,6 +78,8 @@ def process_master(
         elif status:
             workers_status[world_rank] = "IDLE"
             allinall.append(recv_line)
+            if tag_res is not None:
+                all_tag_res[tag_res['file_path'].split('/')[-1].split('.')[0]] = tag_res
 
         if tasks_recv == len(files) or tasks_recv % 1000 == 0:
             logger.info(
@@ -119,15 +124,17 @@ def process_master(
     with open(json_file, "r") as f:
         ori_files = json.load(f)
     collect_root = os.path.join(save_data_root, ori_files[0].split('/')[0])
-    output = {}
-    for sub_dir in os.listdir(collect_root):
-        label_root = os.path.join(collect_root, sub_dir, 'labels')
-        if os.path.exists(label_root):
-            for label_name in os.listdir(label_root):
-                with open(os.path.join(label_root, label_name), 'r') as f:
-                    output[label_name.split('.')[0]] = json.load(f)
+    os.makedirs(collect_root, exist_ok=True)
+    # output = {}
+    # for sub_dir in tqdm(os.listdir(collect_root)):
+    #     label_root = os.path.join(collect_root, sub_dir, 'labels')
+    #     if os.path.exists(label_root):
+    #         for label_name in os.listdir(label_root):
+    #             with open(os.path.join(label_root, label_name), 'r') as f:
+    #                 output[label_name.split('.')[0]] = json.load(f)
+    #             os.system('rm {}'.format(os.path.join(label_root, label_name)))
     with open(os.path.join(collect_root, 'tag.json'), 'w') as f:
-        json.dump(output, f)
+        json.dump(all_tag_res, f)
 
     end = datetime.datetime.now()
     logger.success(f"Time: {end - begin} | Error num: {len(allerror)}")
@@ -142,20 +149,21 @@ def process_worker():
         if file == None:
             break
         cfg_file, base_data_root, condition_data_root, save_root, json_line = file
-        status, line = generate(
+        status, line, tag_res = generate(
             cfg_file, base_data_root, condition_data_root, save_root, json_line
         )
-        world.send([status, line, world_rank], dest=0)
+        world.send([status, line, tag_res, world_rank], dest=0)
 
 
 def generate(cfg_file, base_data_root, condition_data_root, save_root, json_line):
 
     try:
         tag_parse = TagParse(cfg_file)
-        tag_parse.process(base_data_root, condition_data_root, save_root, json_line)
-        return True, os.path.join(base_data_root, json_line)
+        tag_res = tag_parse.process(base_data_root, condition_data_root, save_root, json_line)
+        return True, os.path.join(base_data_root, json_line), tag_res
     except:
-        return False, os.path.join(base_data_root, json_line)
+
+        return False, os.path.join(base_data_root, json_line), None
 
 
 if __name__ == "__main__":
