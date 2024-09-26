@@ -251,7 +251,7 @@ class EgoPathPacker2LaneSeq:
                 end_lane_ids = [end_lane_ids[min_end_select]]
 
         start_match_idx = []
-        if not junction_info["in_junction"]:
+        if not junction_info["in_junction"] or in_junction_info[0] is None:
             for start_lane_id in start_lane_ids:
                 start_match_idx.extend(
                     self.match_lane_seqs(set((start_lane_id,)), seq_lane_ids_sets)

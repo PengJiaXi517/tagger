@@ -3,6 +3,7 @@ import os
 import requests
 import argparse
 import json
+from tqdm import tqdm
 
 def trigger_dag(pre_task_name, dag_id, endpoint, params, user, password, task_name):
     input_data = dict()
@@ -11,7 +12,7 @@ def trigger_dag(pre_task_name, dag_id, endpoint, params, user, password, task_na
     headers = {"Content-type": "application/json"}
     url = "https://{}/api/v1/dags/{}/dagRuns".format(endpoint, dag_id)
     response = requests.post(url, data=json.dumps(input_data), auth=(user, password), headers=headers)
-    print(response.text)
+    # print(response.text)
     res_status_code =  response.status_code
     retry_count = 0
     while res_status_code >= 400 and retry_count < 10:
@@ -25,8 +26,13 @@ def trigger_dag_warper(pre_task_name, base_data_root, condition_data_root, json_
     params = dict()
     params["arg"] = f"""
           set -ex
-          pip install pyntcloud
-          pip install shapely==2.0.1
+          pip install /mnt/train2/eric.wang/shapely-2.0.1-cp37-cp37m-manylinux_2_17_x86_64.manylinux2014_x86_64.whl
+          pip install /mnt/train2/eric.wang/jmespath-1.0.1-py3-none-any.whl
+          pip install /mnt/train2/eric.wang/pyntcloud-0.3.1-py2.py3-none-any.whl
+          pip install /mnt/train2/eric.wang/urllib3-1.26.19-py2.py3-none-any.whl
+          pip install /mnt/train2/eric.wang/botocore-1.33.13-py3-none-any.whl
+          pip install /mnt/train2/eric.wang/s3transfer-0.8.2-py3-none-any.whl
+          pip install /mnt/train2/eric.wang/boto3-1.33.1-py3-none-any.whl
           cd /mnt/train2/RoadPercep/eric.wang/Code/path-nn-tagger/
           mpiexec --allow-run-as-root -np 12 python mpi_process.py --base_data_root {base_data_root}  --condition_data_root {condition_data_root} --json_file {json_file} --save_root {save_root} --cfg_file {cfg_file}
     """
@@ -66,13 +72,13 @@ if __name__ == '__main__':
             json.dump(v, f)
 
 
-    for i, json_path in enumerate(os.listdir(args.split_json_path)):
+    for i, json_path in tqdm(enumerate(os.listdir(args.split_json_path))):
         # if 'part' in json_path:
         #     continue
         trigger_dag_warper(args.pre_task_name,
                             args.base_data_root,
                            args.condition_data_root,
-                           os.path.join(args.split_json_path, json_path),
+                           os.path.join(args.split_json_path, json_path).strip(),
                            args.save_root,
                            args.cfg_file)
         # break
