@@ -18,6 +18,7 @@ from tag_functions.future_path_tag import *
 from tag_functions.interactive_tag import *
 from tag_functions.map_risk import *
 from tag_functions.path_risk import *
+from tag_functions.high_value_tag import *
 from utils.config import Config
 
 
