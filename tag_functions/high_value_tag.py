@@ -6,6 +6,7 @@ import math
 from shapely.geometry import LineString, Point, Polygon
 from base import PercepMap, TagData
 import matplotlib.pyplot as plt
+from collections import defaultdict
 from registry import TAG_FUNCTIONS
 
 @dataclass(repr=False)
@@ -33,13 +34,39 @@ class JunctionBypassTag:
         }
 
 @dataclass(repr=False)
+class YieldVRUTag:
+    def __init__(self) -> None:
+        self.is_yield_vru: bool = False
+    
+    def as_dict(self):
+        return {
+            "is_yield_vru": self.is_yield_vru,
+        }
+
+@dataclass(repr=False)
+class MixedTrafficTag:
+    def __init__(self) -> None:
+        self.is_mixed_traffic: bool = False
+        self.future_mixed_traffic = [[False, False] for i in range(80)]
+    
+    def as_dict(self):
+        return {
+            "is_mixed_traffic": self.is_mixed_traffic,
+            "future_mixed_traffic:": self.future_mixed_traffic
+        }
+
+@dataclass(repr=False)
 class HighValueTag:
     narrow_road_tag: NarrowRoadTag = None
     junction_bypass_tag: JunctionBypassTag = None
+    yield_vru_tag: YieldVRUTag = None
+    mixed_traffic_tag: MixedTrafficTag = None
     def as_dict(self):
         return {
             "narrow_road_tag": self.narrow_road_tag.as_dict(),
             "junction_bypass_tag": self.junction_bypass_tag.as_dict(),
+            "yield_vru_tag": self.yield_vru_tag.as_dict(),
+            "mixed_traffic_tag": self.mixed_traffic_tag.as_dict(),
         }
 
 def valid_check(data: TagData)-> bool:
@@ -60,7 +87,7 @@ def get_bbox(center_x: float, center_y: float, heading: float, length: float, wi
     bbox = [corner1, corner2, corner3, corner4]
     return bbox
 
-def get_polygon(future_path, idx, obstacle):
+def get_ego_polygon(future_path, idx, obstacle):
     x, y = future_path[idx]
     if idx == 0:
         next_x, next_y = future_path[1]
@@ -124,7 +151,7 @@ def check_collision_obs(veh_polygon, obstacles, id_polygon):
             break       
     return collision_left, collision_right
 
-def delete_moving_obstacles(obstacles):
+def get_static_obs_polygon(obstacles):
     moving_obs_id = []
     id_polygon = {}
     for id, obs in obstacles.items():
@@ -144,6 +171,17 @@ def delete_moving_obstacles(obstacles):
     for i in range(len(moving_obs_id)):
         del obstacles[moving_obs_id[i]]
     return obstacles, id_polygon
+
+def get_moving_obs(obstacles):
+    static_obs_id = []
+    for id, obs in obstacles.items():
+        if id == -9:
+            continue
+        if is_static(obs):
+            static_obs_id.append(id)
+    for i in range(len(static_obs_id)):
+        del obstacles[static_obs_id[i]]
+    return obstacles
 
 def get_curvature(ego_path_info):
     def normal_angle(theta):
@@ -167,6 +205,36 @@ def get_curvature(ego_path_info):
     turn_type = np.insert(turn_type, 0, [turn_type[0], turn_type[0]], axis=0)
     return curvature, turn_type
 
+def detect_braking_and_stop(ego_future_states):
+    speeds = []
+    is_braking = False
+    stop_point = None
+    for idx, state in enumerate(ego_future_states):
+        speed = np.linalg.norm([state['vx'], state['vy']])
+        speeds.append(speed)
+        if speed < 0.2:
+            if len(speeds) < 3 or math.fabs(speeds[-1] - speeds[0]) < 0.3:
+                return False, None
+            speed_diff = [speeds[i] - speeds[i + 1] for i in range(len(speeds) - 1)]
+            is_braking = (sum(1 for v in speed_diff if v >= 0) / len(speed_diff)) > 0.7
+            stop_point = Point([state['x'], state['y']])
+            break
+    return is_braking, stop_point
+
+def get_obs_future_polygon(obstacles):
+    obs_future_polygon = defaultdict(dict)
+    for obs_id, obs in obstacles.items():
+        if obs_id == -9:
+            continue
+        obs_future_states = obs['future_trajectory']['future_states']
+        length = obs['features']['length']
+        width = obs['features']['width']
+        for obs_state in obs_future_states:
+            obs_bbox = get_bbox(obs_state['x'], obs_state['y'], obs_state['theta'], length, width)
+            obs_polygon = Polygon([obs_bbox[0], obs_bbox[1], obs_bbox[2], obs_bbox[3], obs_bbox[0]])
+            obs_future_polygon[obs_state['timestamp']][obs_id] = obs_polygon
+    return obs_future_polygon
+
 def label_narrow_road_tag(
     data: TagData) -> NarrowRoadTag:
     narrow_road_tag = NarrowRoadTag()
@@ -184,10 +252,10 @@ def label_narrow_road_tag(
         return narrow_road_tag
 
     # 删除非静止的障碍物
-    obstacles, id_polygon = delete_moving_obstacles(obstacles)
+    obstacles, id_polygon = get_static_obs_polygon(obstacles)
     
     for idx, (x, y) in enumerate(ego_path_info.future_path):
-        veh_polygon = get_polygon(ego_path_info.future_path, idx, obstacles[-9])
+        veh_polygon = get_ego_polygon(ego_path_info.future_path, idx, obstacles[-9])
 
         collision_left, collision_right = check_collision_curb(veh_polygon, curbs, curbs_lat_decision)
         narrow_road_tag.future_narrow_road[idx][0] |= collision_left
@@ -210,13 +278,14 @@ def label_junction_bypass_tag(data: TagData,
         return junction_bypass_tag
     ego_path_info = data.label_scene.ego_path_info
     in_junction_id = ego_path_info.in_junction_id
-    
+   
+    junction_scene = any(obj is not None for obj in in_junction_id)
+    if not junction_scene:
+        return junction_bypass_tag
+
     curvature, turn_type = get_curvature(ego_path_info)
 
-    junction_scene = any(obj is not None for obj in in_junction_id)
     for idx, (x, y) in enumerate(ego_path_info.future_path):
-        if not junction_scene:
-            continue
         if curvature[idx] < 0.03:
             continue
         if turn_type[idx] > 0 and narrow_road_tag.future_narrow_road[idx][0]:
@@ -227,6 +296,63 @@ def label_junction_bypass_tag(data: TagData,
     junction_bypass_tag.is_junction_bypass = any(junction_bypass_tag.future_junction_bypass)
     return junction_bypass_tag
 
+def label_yield_vru_tag(data: TagData) -> YieldVRUTag:
+    yield_vru_tag = YieldVRUTag()
+    if not valid_check(data):
+        return yield_vru_tag
+    obstacles = data.label_scene.obstacles
+    future_path = data.label_scene.ego_path_info.future_path
+    ego_future_states = obstacles[-9]['future_trajectory']['future_states']
+    
+    # 判断是否有减速行为
+    is_braking, stop_point = detect_braking_and_stop(ego_future_states)
+    if not is_braking or stop_point is None:
+        return yield_vru_tag
+
+    # 判断vru future_states与ego future_path是否相交，计算交点与刹停点的距离
+    future_path_polyline = LineString(future_path)
+    for idx, obs in obstacles.items():
+        if idx == -9 or (obs['features']['type'] != "PEDESTRIAN" 
+                        and obs['features']['type'] != "BICYCLE"):
+            continue
+        obs_future_traj = [(state['x'], state['y']) for state in obs['future_trajectory']['future_states']]
+        if len(obs_future_traj) < 2:
+            continue
+        obs_polyline = LineString(obs_future_traj)
+        intersection_pt = obs_polyline.intersection(future_path_polyline)
+        if intersection_pt.is_empty:
+            continue
+        if stop_point.distance(intersection_pt) < 5:
+            yield_vru_tag.is_yield_vru = True
+            break
+    
+    return yield_vru_tag
+
+def label_mixed_traffic_tag(data: TagData)-> MixedTrafficTag:
+    mixed_traffic_tag = MixedTrafficTag()
+    # 判断自车5s内是否静止
+    if is_static(data.label_scene.obstacles[-9]):
+        return mixed_traffic_tag
+    # 删除静止障碍物
+    obstacles = get_moving_obs(data.label_scene.obstacles)
+    future_obs_polygon = get_obs_future_polygon(obstacles)
+
+    ego_obs = obstacles[-9]
+    ego_future_states = ego_obs['future_trajectory']['future_states']
+    ego_length = ego_obs['features']['length']
+    ego_width = ego_obs['features']['width']
+    for idx, ego_state in enumerate(ego_future_states):
+        ts_us = ego_state['timestamp']
+        ego_bbox = get_bbox(ego_state['x'], ego_state['y'], ego_state['theta'], ego_length, ego_width)
+        ego_polygon = Polygon([ego_bbox[0], ego_bbox[1], ego_bbox[2], ego_bbox[3], ego_bbox[0]])
+        collision_left, collision_right = check_collision_obs(ego_polygon, obstacles, future_obs_polygon[ts_us])
+        mixed_traffic_tag.future_mixed_traffic[idx][0] |= collision_left
+        mixed_traffic_tag.future_mixed_traffic[idx][1] |= collision_right
+    
+    tmp = [any(obj) for obj in mixed_traffic_tag.future_mixed_traffic]
+    mixed_traffic_tag.is_mixed_traffic = any(tmp)
+    return mixed_traffic_tag
+
 @TAG_FUNCTIONS.register()
 def high_value_tag(data: TagData, params: Dict) -> Dict:
     high_value_tag = HighValueTag()
@@ -234,5 +360,9 @@ def high_value_tag(data: TagData, params: Dict) -> Dict:
     high_value_tag.narrow_road_tag = label_narrow_road_tag(data)
     # 判断路口内绕障
     high_value_tag.junction_bypass_tag = label_junction_bypass_tag(data, high_value_tag.narrow_road_tag)
+    # 判断是否在礼让vru而减速
+    high_value_tag.yield_vru_tag = label_yield_vru_tag(data)
+    # 判断8s内是否与动目标交互
+    high_value_tag.mixed_traffic_tag = label_mixed_traffic_tag(data)
 
     return high_value_tag.as_dict()
