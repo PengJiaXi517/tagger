@@ -56,17 +56,31 @@ class MixedTrafficTag:
         }
 
 @dataclass(repr=False)
+class RampTag:
+    def __init__(self) -> None:
+        self.is_enter_ramp: bool = False
+        self.is_exit_ramp: bool = False
+
+    def as_dict(self):
+        return {
+            "is_enter_ramp": self.is_enter_ramp,
+            "is_exit_ramp": self.is_exit_ramp,
+        }
+
+@dataclass(repr=False)
 class HighValueTag:
     narrow_road_tag: NarrowRoadTag = None
     junction_bypass_tag: JunctionBypassTag = None
     yield_vru_tag: YieldVRUTag = None
     mixed_traffic_tag: MixedTrafficTag = None
+    ramp_tag: RampTag = None
     def as_dict(self):
         return {
             "narrow_road_tag": self.narrow_road_tag.as_dict(),
             "junction_bypass_tag": self.junction_bypass_tag.as_dict(),
             "yield_vru_tag": self.yield_vru_tag.as_dict(),
             "mixed_traffic_tag": self.mixed_traffic_tag.as_dict(),
+            "ramp_tag": self.ramp_tag.as_dict(),
         }
 
 def valid_check(data: TagData)-> bool:
@@ -235,6 +249,122 @@ def get_obs_future_polygon(obstacles):
             obs_future_polygon[obs_state['timestamp']][obs_id] = obs_polygon
     return obs_future_polygon
 
+def get_nearest_lane_id(lane_map, lane_seqs, target_point, current_lane_seqs):
+    min_dist = 100000
+    nearest_lane_id = None
+    for lane_seq in lane_seqs:
+        for lane_id in lane_seq:
+            if any(lane_id in obj for obj in current_lane_seqs):
+                continue
+            nearest_polyline = LineString(lane_map[lane_id]['polyline'])
+            dist = target_point.distance(nearest_polyline)
+            if dist < min_dist and dist < 5 and dist > 0:
+                min_dist = dist
+                nearest_lane_id = lane_seq[0]
+    return nearest_lane_id
+
+def get_nearest_waypoint_idx(lane_polyline, ego_point):
+    distance = lambda point: (point[0] - ego_point.x)**2 + (point[1] - ego_point.y)**2
+    return min(enumerate(lane_polyline), key=lambda x: distance(x[1]))[0]
+
+def judge_enter_ramp(lane_map, lane_ids, ego_point):
+    cur_lane = lane_map[lane_ids[0]]['polyline']
+    adjacent_lane = lane_map[lane_ids[1]]['polyline']
+
+    # 在lane上找最近点的索引
+    cur_idx = get_nearest_waypoint_idx(cur_lane, ego_point)
+    adjacent_idx = get_nearest_waypoint_idx(adjacent_lane, ego_point)
+    
+    # 截取自车前方consider_len个点
+    consider_len = 100
+    if cur_idx < len(cur_lane) - consider_len:
+        cur_lane = cur_lane[cur_idx: cur_idx + consider_len]
+    else:
+        cur_lane = cur_lane[cur_idx:]
+        if len(lane_map[lane_ids[0]]['successor_id']) > 0:
+            cur_succ_id = lane_map[lane_ids[0]]['successor_id'][0]
+            concate_len = consider_len - len(cur_lane)
+            cur_lane = cur_lane + lane_map[cur_succ_id]['polyline'][:concate_len]
+    
+    if adjacent_idx < len(adjacent_lane) - consider_len:
+        adjacent_lane = adjacent_lane[adjacent_idx: adjacent_idx + consider_len]
+    else:
+        adjacent_lane = adjacent_lane[adjacent_idx:]
+        if len(lane_map[lane_ids[1]]['successor_id']) > 0:
+            adjacent_succ_id = lane_map[lane_ids[1]]['successor_id'][0]
+            concate_len = consider_len - len(adjacent_lane)
+            adjacent_lane = adjacent_lane + lane_map[adjacent_succ_id]['polyline'][:concate_len]
+    
+    min_length = min(len(cur_lane), len(adjacent_lane))
+    if min_length < 3:
+        return False
+    cur_lane = cur_lane[:min_length]
+    adjacent_lane = adjacent_lane[:min_length]
+
+    large_dist_num = 0
+    adjacent_linestring = LineString(adjacent_lane)
+    for idx, point in enumerate(cur_lane):
+        if idx % 2 or adjacent_linestring.distance(Point(point)) < 10:
+            continue
+        large_dist_num += 1
+        if large_dist_num > 3:
+            return True
+    return False
+
+def judge_exit_ramp(lane_map, lane_ids, ego_point, cur_lane_id):
+    if cur_lane_id not in lane_ids:
+        return False
+    if lane_ids[1] == cur_lane_id:
+        lane_ids[0], lane_ids[1] = lane_ids[1], lane_ids[0]
+
+    cur_lane = lane_map[lane_ids[0]]['polyline']
+    adjacent_lane = lane_map[lane_ids[1]]['polyline']
+    
+    if len(cur_lane) < 10 or len(adjacent_lane) < 10:
+        return False
+    
+    # 在lane上找最近点的索引
+    cur_idx = get_nearest_waypoint_idx(cur_lane, ego_point)
+    consider_len = 100
+    if cur_idx < len(cur_lane) - consider_len:
+        return False
+    
+    # 无分叉情况，需要对齐两条lane的终点
+    if Point(cur_lane[-1]).distance(Point(adjacent_lane[-1])) > 1.0:
+        adjacent_idx = get_nearest_waypoint_idx(adjacent_lane, Point(cur_lane[-1]))
+        adjacent_lane = adjacent_lane[:adjacent_idx + 1]
+    
+    # 截取汇入点前的consider_len个点
+    if len(cur_lane) > consider_len:
+        cur_lane = cur_lane[-consider_len:]
+    elif len(lane_map[lane_ids[0]]['predecessor_id']) > 0:
+        cur_pred_id = lane_map[lane_ids[0]]['predecessor_id'][0]
+        concate_len = consider_len - len(cur_lane)
+        cur_lane = lane_map[cur_pred_id]['polyline'][-concate_len:] + cur_lane
+    
+    if len(adjacent_lane) > consider_len:
+        adjacent_lane = adjacent_lane[-consider_len:]
+    elif len(lane_map[lane_ids[1]]['predecessor_id']) > 0:
+        adjacent_pred_id = lane_map[lane_ids[1]]['predecessor_id'][0]
+        concate_len = consider_len - len(adjacent_lane)
+        adjacent_lane = lane_map[adjacent_pred_id]['polyline'][-concate_len:] + adjacent_lane
+    
+    min_length = min(len(cur_lane), len(adjacent_lane))
+    if min_length < 3:
+        return False
+    cur_lane = cur_lane[-min_length:]
+    adjacent_lane = adjacent_lane[-min_length:]
+
+    large_dist_num = 0
+    adjacent_linestring = LineString(adjacent_lane)
+    for idx, point in enumerate(cur_lane):
+        if idx % 2 or adjacent_linestring.distance(Point(point)) < 10:
+            continue
+        large_dist_num += 1
+        if large_dist_num > 3:
+            return True
+    return False
+
 def label_narrow_road_tag(
     data: TagData) -> NarrowRoadTag:
     narrow_road_tag = NarrowRoadTag()
@@ -353,6 +483,70 @@ def label_mixed_traffic_tag(data: TagData)-> MixedTrafficTag:
     mixed_traffic_tag.is_mixed_traffic = any(tmp)
     return mixed_traffic_tag
 
+def label_ramp_tag(data):
+    ramp_tag = RampTag()
+    obstacles = data.label_scene.obstacles
+    lane_map = data.label_scene.percepmap.lane_map
+    current_lanes = data.label_scene.ego_obs_lane_seq_info.current_lanes
+    current_lane_seqs = data.label_scene.ego_obs_lane_seq_info.current_lane_seqs
+    nearby_lane_seqs = data.label_scene.ego_obs_lane_seq_info.nearby_lane_seqs
+    
+    if len(current_lanes) < 1 or len(current_lane_seqs) < 1:
+        return ramp_tag
+    for lane_seq in current_lane_seqs:
+        for lane_id in lane_seq:
+            if lane_map[lane_id]['turn'] != 'NOTURN':
+                return ramp_tag
+    
+    ego_x = obstacles[-9]["features"]["history_states"][-1]["x"]
+    ego_y = obstacles[-9]["features"]["history_states"][-1]["y"]
+    ego_point = Point([ego_x, ego_y])
+    
+    has_fork = False
+    # 判断是否为进匝道: 一分成二的情况
+    pred_ids = lane_map[current_lanes[0]]['predecessor_id']
+    if len(pred_ids) == 1:
+        succ_ids = lane_map[pred_ids[0]]['successor_id']
+        if len(succ_ids) == 2:
+            has_fork = True
+            if judge_enter_ramp(lane_map, succ_ids, ego_point):
+                ramp_tag.is_enter_ramp= True
+                return ramp_tag
+    
+    # 判断是否为进匝道: lane无分叉点的情况
+    if not has_fork:
+        nearest_lane_id = get_nearest_lane_id(lane_map, nearby_lane_seqs, ego_point, current_lane_seqs)
+        if nearest_lane_id is not None:
+            if judge_enter_ramp(lane_map, [current_lanes[0], nearest_lane_id], ego_point):
+                ramp_tag.is_enter_ramp = True
+                return ramp_tag
+    
+    has_merge = False
+    #判断是否为出匝道: 二合成一的情况
+    succ_ids = lane_map[current_lanes[0]]['successor_id']
+    if len(succ_ids) == 1:
+        pred_ids = lane_map[succ_ids[0]]['predecessor_id']
+        if len(pred_ids) == 2:
+            has_merge = True
+            if judge_exit_ramp(lane_map, pred_ids, ego_point, current_lanes[0]):
+                ramp_tag.is_exit_ramp = True
+                return ramp_tag
+    
+    # 判断是否为出匝道: lane无分叉点的情况
+    if not has_merge:
+        if len(current_lane_seqs) == 1 and len(current_lane_seqs[0]) == 2:
+            # 出口位置的大致坐标
+            target_point = Point(lane_map[current_lane_seqs[0][0]]['polyline'][-1])
+            # 找到出口处的最近车道
+            nearest_lane_id = get_nearest_lane_id(
+                lane_map, data.condition_res.seq_lane_ids_raw, target_point, current_lane_seqs)
+            if nearest_lane_id is not None:
+                if judge_exit_ramp(lane_map, [current_lanes[0], nearest_lane_id], ego_point, current_lanes[0]):
+                    ramp_tag.is_exit_ramp = True
+                    return ramp_tag
+                                              
+    return ramp_tag    
+
 @TAG_FUNCTIONS.register()
 def high_value_tag(data: TagData, params: Dict) -> Dict:
     high_value_tag = HighValueTag()
@@ -364,5 +558,7 @@ def high_value_tag(data: TagData, params: Dict) -> Dict:
     high_value_tag.yield_vru_tag = label_yield_vru_tag(data)
     # 判断8s内是否与动目标交互
     high_value_tag.mixed_traffic_tag = label_mixed_traffic_tag(data)
+    # 判断汇入汇出匝道
+    high_value_tag.ramp_tag = label_ramp_tag(data)
 
     return high_value_tag.as_dict()
