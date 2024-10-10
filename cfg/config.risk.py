@@ -13,7 +13,11 @@ tag_pipelines = {
         "sample_point_length": 1.0,
     },
     "interactive_tag": {},
-    "high_value_tag": {},
+    "high_value_tag": {
+        "near_static_obs_dist_strict": 0.9,
+        "near_static_obs_dist_relax": 1.5,
+        "curvature_th": 0.05,
+    },
 }
 
 max_valid_point_num = 100

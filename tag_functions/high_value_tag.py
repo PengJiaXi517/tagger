@@ -14,6 +14,7 @@ class NarrowRoadTag:
     def __init__(self) -> None:
         self.is_narrow_road: bool = False
         self.future_narrow_road = [[False, False] for i in range(100)]
+        self.future_narrow_road_relax = [[False, False] for i in range(100)]
 
     def as_dict(self):
         return {
@@ -116,37 +117,42 @@ def get_ego_polygon(future_path, idx, obstacle):
     return veh_polygon
 
 def is_static(obstacle):
-    if not obstacle["features"]["is_still"]:
-        return False
     future_states = obstacle['future_trajectory']['future_states']
-    if len(future_states) < 1:
+    if len(future_states) < 2:
+        return obstacle["features"]["is_still"]
+    pt_start = Point([future_states[0]['x'], future_states[0]['y']])
+    pt_end = Point([future_states[-1]['x'], future_states[-1]['y']])
+    if pt_start.distance(pt_end) < 0.2:
         return True
-    cur_state = future_states[0]
-    for state in future_states:
-        if (state['timestamp']) > cur_state['timestamp'] + 5e6:
-            break
-        if math.fabs(state['vx']) > 0.1 or math.fabs(state['vy']) > 0.1:
-            return False
-    return True
+    return False
 
-def check_collision_curb(veh_polygon, curbs, curb_lat_decision):
-    collision_left, collision_right = False, False
+def check_collision_curb(veh_polygon, curbs, curb_lat_decision, params):
+    collision_info = {'left_strict': False, 'right_strict': False,
+                      'left_relax': False, 'right_relax': False}
     for idx, curb in enumerate(curbs):
         lat_decision = curb_lat_decision[idx]
         if lat_decision == 0:
             continue 
         curb_string = LineString(curb)
-        if curb_string.distance(veh_polygon) < 1.5:
+        dist = curb_string.distance(veh_polygon)
+        if dist < params.near_static_obs_dist_strict:
             if lat_decision == 1:
-                collision_right = True
+                collision_info['right_strict'] = True
             elif lat_decision == 2:
-                collision_left = True
-        if collision_left and collision_right:
+                collision_info['left_strict'] = True
+        if dist < params.near_static_obs_dist_relax:
+            if lat_decision == 1:
+                collision_info['right_relax'] = True
+            elif lat_decision == 2:
+                collision_info['left_relax'] = True
+        if collision_info['left_strict'] and collision_info['right_strict']:
             break
-    return collision_left, collision_right    
+    return collision_info  
 
-def check_collision_obs(veh_polygon, obstacles, id_polygon):
-    collision_left, collision_right = False, False
+def check_collision_obs(veh_polygon, obstacles, id_polygon, params):
+    collision_info = {'left_strict': False, 'right_strict': False,
+                      'left_relax': False, 'right_relax': False}
+
     for k, v in obstacles.items():
         if k == -9:
             continue
@@ -156,18 +162,29 @@ def check_collision_obs(veh_polygon, obstacles, id_polygon):
         if k not in id_polygon:
             continue
         obs_polygon = id_polygon[k]
-        if veh_polygon.distance(obs_polygon) < 1.5:
+        dist = veh_polygon.distance(obs_polygon)
+        if dist < params.near_static_obs_dist_strict:
             if lat_decision == 1:
-                collision_right = True
+                collision_info['right_strict'] = True
             elif lat_decision == 2:
-                collision_left = True
-        if collision_left and collision_right:
+                collision_info['left_strict'] = True    
+                # plt.figure(figsize=(14, 12))
+                # plt.fill(*veh_polygon.exterior.xy, color='blue', alpha=0.5)  
+                # plt.fill(*obs_polygon.exterior.xy, color='green', alpha=0.5)
+                # plt.show()
+        if dist < params.near_static_obs_dist_relax:
+            if lat_decision == 1:
+                collision_info['right_relax'] = True
+            elif lat_decision == 2:
+                collision_info['left_relax'] = True
+        if collision_info['right_strict'] and collision_info['left_strict']:
             break       
-    return collision_left, collision_right
+
+    return collision_info
 
 def get_static_obs_polygon(obstacles):
-    moving_obs_id = []
     id_polygon = {}
+    static_obs = {}
     for id, obs in obstacles.items():
         if id == -9:
             continue
@@ -180,22 +197,19 @@ def get_static_obs_polygon(obstacles):
             obs_bbox = get_bbox(obs_x, obs_y, obs_theta, length, width)
             obs_polygon = Polygon([obs_bbox[0], obs_bbox[1], obs_bbox[2], obs_bbox[3], obs_bbox[0]])
             id_polygon[id] = obs_polygon
-            continue
-        moving_obs_id.append(id)
-    for i in range(len(moving_obs_id)):
-        del obstacles[moving_obs_id[i]]
-    return obstacles, id_polygon
+            static_obs[id] = obs
+
+    return static_obs, id_polygon
 
 def get_moving_obs(obstacles):
-    static_obs_id = []
+    moving_obs = {}
     for id, obs in obstacles.items():
         if id == -9:
             continue
-        if is_static(obs):
-            static_obs_id.append(id)
-    for i in range(len(static_obs_id)):
-        del obstacles[static_obs_id[i]]
-    return obstacles
+        if not is_static(obs):
+            moving_obs[id] = obs
+
+    return moving_obs
 
 def get_curvature(ego_path_info):
     def normal_angle(theta):
@@ -264,16 +278,29 @@ def get_nearest_lane_id(lane_map, lane_seqs, target_point, current_lane_seqs):
     return nearest_lane_id
 
 def get_nearest_waypoint_idx(lane_polyline, ego_point):
-    distance = lambda point: (point[0] - ego_point.x)**2 + (point[1] - ego_point.y)**2
-    return min(enumerate(lane_polyline), key=lambda x: distance(x[1]))[0]
+    lane_array = np.array(lane_polyline)
+    distances = np.sqrt(np.sum((lane_array - [ego_point.x, ego_point.y])**2, axis=1))
+    nearest_idx = np.argmin(distances)
+    if distances[nearest_idx] > 5:
+        nearest_idx = -1
+    
+    return nearest_idx
 
 def judge_enter_ramp(lane_map, lane_ids, ego_point):
+    # 滤除对向车道
+    v1 = lane_map[lane_ids[0]]['unit_directions'][0]
+    v2 = lane_map[lane_ids[1]]['unit_directions'][0]
+    if v1[0] * v2[0] + v1[1] * v2[1] < 0:
+        return False
+
     cur_lane = lane_map[lane_ids[0]]['polyline']
     adjacent_lane = lane_map[lane_ids[1]]['polyline']
 
     # 在lane上找最近点的索引
     cur_idx = get_nearest_waypoint_idx(cur_lane, ego_point)
     adjacent_idx = get_nearest_waypoint_idx(adjacent_lane, ego_point)
+    if cur_idx == -1 or adjacent_idx == -1:
+        return False
     
     # 截取自车前方consider_len个点
     consider_len = 100
@@ -283,8 +310,9 @@ def judge_enter_ramp(lane_map, lane_ids, ego_point):
         cur_lane = cur_lane[cur_idx:]
         if len(lane_map[lane_ids[0]]['successor_id']) > 0:
             cur_succ_id = lane_map[lane_ids[0]]['successor_id'][0]
-            concate_len = consider_len - len(cur_lane)
-            cur_lane = cur_lane + lane_map[cur_succ_id]['polyline'][:concate_len]
+            if lane_map[cur_succ_id]['lane_category'] == 'REALITY':
+                concate_len = consider_len - len(cur_lane)
+                cur_lane = cur_lane + lane_map[cur_succ_id]['polyline'][:concate_len]
     
     if adjacent_idx < len(adjacent_lane) - consider_len:
         adjacent_lane = adjacent_lane[adjacent_idx: adjacent_idx + consider_len]
@@ -292,8 +320,9 @@ def judge_enter_ramp(lane_map, lane_ids, ego_point):
         adjacent_lane = adjacent_lane[adjacent_idx:]
         if len(lane_map[lane_ids[1]]['successor_id']) > 0:
             adjacent_succ_id = lane_map[lane_ids[1]]['successor_id'][0]
-            concate_len = consider_len - len(adjacent_lane)
-            adjacent_lane = adjacent_lane + lane_map[adjacent_succ_id]['polyline'][:concate_len]
+            if lane_map[adjacent_succ_id]['lane_category'] == 'REALITY':
+                concate_len = consider_len - len(adjacent_lane)
+                adjacent_lane = adjacent_lane + lane_map[adjacent_succ_id]['polyline'][:concate_len]
     
     min_length = min(len(cur_lane), len(adjacent_lane))
     if min_length < 3:
@@ -314,6 +343,12 @@ def judge_enter_ramp(lane_map, lane_ids, ego_point):
 def judge_exit_ramp(lane_map, lane_ids, ego_point, cur_lane_id):
     if cur_lane_id not in lane_ids:
         return False
+    # 滤除对向车道
+    v1 = lane_map[lane_ids[0]]['unit_directions'][0]
+    v2 = lane_map[lane_ids[1]]['unit_directions'][0]
+    if v1[0] * v2[0] + v1[1] * v2[1] < 0:
+        return False
+    
     if lane_ids[1] == cur_lane_id:
         lane_ids[0], lane_ids[1] = lane_ids[1], lane_ids[0]
 
@@ -326,12 +361,14 @@ def judge_exit_ramp(lane_map, lane_ids, ego_point, cur_lane_id):
     # 在lane上找最近点的索引
     cur_idx = get_nearest_waypoint_idx(cur_lane, ego_point)
     consider_len = 100
-    if cur_idx < len(cur_lane) - consider_len:
+    if cur_idx == -1 or cur_idx < len(cur_lane) - consider_len:
         return False
     
     # 无分叉情况，需要对齐两条lane的终点
     if Point(cur_lane[-1]).distance(Point(adjacent_lane[-1])) > 1.0:
         adjacent_idx = get_nearest_waypoint_idx(adjacent_lane, Point(cur_lane[-1]))
+        if adjacent_idx == -1:
+            return False
         adjacent_lane = adjacent_lane[:adjacent_idx + 1]
     
     # 截取汇入点前的consider_len个点
@@ -339,15 +376,17 @@ def judge_exit_ramp(lane_map, lane_ids, ego_point, cur_lane_id):
         cur_lane = cur_lane[-consider_len:]
     elif len(lane_map[lane_ids[0]]['predecessor_id']) > 0:
         cur_pred_id = lane_map[lane_ids[0]]['predecessor_id'][0]
-        concate_len = consider_len - len(cur_lane)
-        cur_lane = lane_map[cur_pred_id]['polyline'][-concate_len:] + cur_lane
+        if lane_map[cur_pred_id]['lane_category'] == 'REALITY':
+            concate_len = consider_len - len(cur_lane)
+            cur_lane = lane_map[cur_pred_id]['polyline'][-concate_len:] + cur_lane
     
     if len(adjacent_lane) > consider_len:
         adjacent_lane = adjacent_lane[-consider_len:]
     elif len(lane_map[lane_ids[1]]['predecessor_id']) > 0:
         adjacent_pred_id = lane_map[lane_ids[1]]['predecessor_id'][0]
-        concate_len = consider_len - len(adjacent_lane)
-        adjacent_lane = lane_map[adjacent_pred_id]['polyline'][-concate_len:] + adjacent_lane
+        if lane_map[adjacent_pred_id]['lane_category'] == 'REALITY':
+            concate_len = consider_len - len(adjacent_lane)
+            adjacent_lane = lane_map[adjacent_pred_id]['polyline'][-concate_len:] + adjacent_lane
     
     min_length = min(len(cur_lane), len(adjacent_lane))
     if min_length < 3:
@@ -366,7 +405,7 @@ def judge_exit_ramp(lane_map, lane_ids, ego_point, cur_lane_id):
     return False
 
 def label_narrow_road_tag(
-    data: TagData) -> NarrowRoadTag:
+    data: TagData, params: Dict) -> NarrowRoadTag:
     narrow_road_tag = NarrowRoadTag()
     if not valid_check(data):
         return narrow_road_tag
@@ -381,27 +420,31 @@ def label_narrow_road_tag(
     if is_static(obstacles[-9]):
         return narrow_road_tag
 
-    # 删除非静止的障碍物
-    obstacles, id_polygon = get_static_obs_polygon(obstacles)
+    static_obs, id_polygon = get_static_obs_polygon(obstacles)
     
     for idx, (x, y) in enumerate(ego_path_info.future_path):
         veh_polygon = get_ego_polygon(ego_path_info.future_path, idx, obstacles[-9])
 
-        collision_left, collision_right = check_collision_curb(veh_polygon, curbs, curbs_lat_decision)
-        narrow_road_tag.future_narrow_road[idx][0] |= collision_left
-        narrow_road_tag.future_narrow_road[idx][1] |= collision_right
+        collision_info = check_collision_curb(veh_polygon, curbs, curbs_lat_decision, params)
+        narrow_road_tag.future_narrow_road[idx][0] |= collision_info['left_strict']
+        narrow_road_tag.future_narrow_road[idx][1] |= collision_info['right_strict']
+        narrow_road_tag.future_narrow_road_relax[idx][0] |= collision_info['left_relax']
+        narrow_road_tag.future_narrow_road_relax[idx][1] |= collision_info['right_relax']
         
-        if collision_left and collision_right:
+        if collision_info['left_strict'] and collision_info['right_strict']:
             continue
-        collision_left, collision_right = check_collision_obs(veh_polygon, obstacles, id_polygon)
-        narrow_road_tag.future_narrow_road[idx][0] |= collision_left
-        narrow_road_tag.future_narrow_road[idx][1] |= collision_right
+
+        collision_info = check_collision_obs(veh_polygon, static_obs, id_polygon, params)
+        narrow_road_tag.future_narrow_road[idx][0] |= collision_info['left_strict']
+        narrow_road_tag.future_narrow_road[idx][1] |= collision_info['right_strict']
+        narrow_road_tag.future_narrow_road_relax[idx][0] |= collision_info['left_relax']
+        narrow_road_tag.future_narrow_road_relax[idx][1] |= collision_info['right_relax']
     
     tmp = [all(obj) for obj in narrow_road_tag.future_narrow_road]
     narrow_road_tag.is_narrow_road = any(tmp)
     return narrow_road_tag
 
-def label_junction_bypass_tag(data: TagData,
+def label_junction_bypass_tag(data: TagData, params: Dict,
     narrow_road_tag: NarrowRoadTag)-> JunctionBypassTag:
     junction_bypass_tag = JunctionBypassTag()
     if not valid_check(data):
@@ -416,11 +459,13 @@ def label_junction_bypass_tag(data: TagData,
     curvature, turn_type = get_curvature(ego_path_info)
 
     for idx, (x, y) in enumerate(ego_path_info.future_path):
-        if curvature[idx] < 0.03:
+        if abs(curvature[idx]) < params.curvature_th:
             continue
-        if turn_type[idx] > 0 and narrow_road_tag.future_narrow_road[idx][0]:
+        if in_junction_id[idx] is None:
+            continue
+        if turn_type[idx] > 0 and narrow_road_tag.future_narrow_road_relax[idx][0]:
             junction_bypass_tag.future_junction_bypass[idx] = True
-        if turn_type[idx] < 0 and narrow_road_tag.future_narrow_road[idx][1]:
+        if turn_type[idx] < 0 and narrow_road_tag.future_narrow_road_relax[idx][1]:
             junction_bypass_tag.future_junction_bypass[idx] = True
 
     junction_bypass_tag.is_junction_bypass = any(junction_bypass_tag.future_junction_bypass)
@@ -458,14 +503,15 @@ def label_yield_vru_tag(data: TagData) -> YieldVRUTag:
     
     return yield_vru_tag
 
-def label_mixed_traffic_tag(data: TagData)-> MixedTrafficTag:
+def label_mixed_traffic_tag(data: TagData, params: Dict)-> MixedTrafficTag:
     mixed_traffic_tag = MixedTrafficTag()
-    # 判断自车5s内是否静止
-    if is_static(data.label_scene.obstacles[-9]):
+    obstacles = data.label_scene.obstacles
+    # 判断自车8s内是否静止
+    if is_static(obstacles[-9]):
         return mixed_traffic_tag
-    # 删除静止障碍物
-    obstacles = get_moving_obs(data.label_scene.obstacles)
-    future_obs_polygon = get_obs_future_polygon(obstacles)
+
+    moving_obs = get_moving_obs(obstacles)
+    future_obs_polygon = get_obs_future_polygon(moving_obs)
 
     ego_obs = obstacles[-9]
     ego_future_states = ego_obs['future_trajectory']['future_states']
@@ -475,9 +521,9 @@ def label_mixed_traffic_tag(data: TagData)-> MixedTrafficTag:
         ts_us = ego_state['timestamp']
         ego_bbox = get_bbox(ego_state['x'], ego_state['y'], ego_state['theta'], ego_length, ego_width)
         ego_polygon = Polygon([ego_bbox[0], ego_bbox[1], ego_bbox[2], ego_bbox[3], ego_bbox[0]])
-        collision_left, collision_right = check_collision_obs(ego_polygon, obstacles, future_obs_polygon[ts_us])
-        mixed_traffic_tag.future_mixed_traffic[idx][0] |= collision_left
-        mixed_traffic_tag.future_mixed_traffic[idx][1] |= collision_right
+        collision_info = check_collision_obs(ego_polygon, moving_obs, future_obs_polygon[ts_us], params)
+        mixed_traffic_tag.future_mixed_traffic[idx][0] |= collision_info['left_strict']
+        mixed_traffic_tag.future_mixed_traffic[idx][1] |= collision_info['right_strict']
     
     tmp = [any(obj) for obj in mixed_traffic_tag.future_mixed_traffic]
     mixed_traffic_tag.is_mixed_traffic = any(tmp)
@@ -495,7 +541,8 @@ def label_ramp_tag(data):
         return ramp_tag
     for lane_seq in current_lane_seqs:
         for lane_id in lane_seq:
-            if lane_map[lane_id]['turn'] != 'NOTURN':
+            if lane_map[lane_id]['turn'] != 'NOTURN' or (
+               lane_map[lane_id]['lane_category'] != 'REALITY'):
                 return ramp_tag
     
     ego_x = obstacles[-9]["features"]["history_states"][-1]["x"]
@@ -551,13 +598,13 @@ def label_ramp_tag(data):
 def high_value_tag(data: TagData, params: Dict) -> Dict:
     high_value_tag = HighValueTag()
     # 判断窄路通行
-    high_value_tag.narrow_road_tag = label_narrow_road_tag(data)
+    high_value_tag.narrow_road_tag = label_narrow_road_tag(data, params)
     # 判断路口内绕障
-    high_value_tag.junction_bypass_tag = label_junction_bypass_tag(data, high_value_tag.narrow_road_tag)
+    high_value_tag.junction_bypass_tag = label_junction_bypass_tag(data, params, high_value_tag.narrow_road_tag)
     # 判断是否在礼让vru而减速
     high_value_tag.yield_vru_tag = label_yield_vru_tag(data)
     # 判断8s内是否与动目标交互
-    high_value_tag.mixed_traffic_tag = label_mixed_traffic_tag(data)
+    high_value_tag.mixed_traffic_tag = label_mixed_traffic_tag(data, params)
     # 判断汇入汇出匝道
     high_value_tag.ramp_tag = label_ramp_tag(data)
 
