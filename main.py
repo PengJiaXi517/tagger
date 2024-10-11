@@ -18,7 +18,10 @@ from tag_functions.future_path_tag import *
 from tag_functions.interactive_tag import *
 from tag_functions.map_risk import *
 from tag_functions.path_risk import *
-from tag_functions.high_value_tag import *
+from tag_functions.high_value_scene.near_static_obj_tag import *
+from tag_functions.high_value_scene.mixed_traffic_tag import *
+from tag_functions.high_value_scene.yield_vru_tag import *
+from tag_functions.high_value_scene.ramp_tag import *
 from utils.config import Config
 
 
