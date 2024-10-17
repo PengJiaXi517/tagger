@@ -35,13 +35,17 @@ def ramp_tag(data: TagData, params: Dict) -> Dict:
     current_lanes = data.label_scene.ego_obs_lane_seq_info.current_lanes
     current_lane_seqs = data.label_scene.ego_obs_lane_seq_info.current_lane_seqs
     ego_path_info = data.label_scene.ego_path_info
-    curb_decision = data.label_scene.label_res["curb_label"]["decision"]
+    curb_decision = data.label_scene.label_res["curb_label"].get(
+        "decision", None
+    )
     obstacles = data.label_scene.obstacles
 
     ego_point = obs_filter.get_ego_point(obstacles)
 
-    if not valid_check(data) or not ramp_judge.pre_check(
-        lane_map, current_lanes, current_lane_seqs
+    if (
+        curb_decision is None
+        or not valid_check(data)
+        or not ramp_judge.pre_check(lane_map, current_lanes, current_lane_seqs)
     ):
         return ramp_tag.as_dict()
 

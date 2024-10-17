@@ -101,6 +101,9 @@ class RampJudge:
         curb_decision,
         lc_point=None,
     ):
+        # 检查两条lane id是否在lane_map中
+        if not self.is_in_lanemap(lane_map, cur_lane_id, nearby_lane_id):
+            return False
         # 滤除对向车道
         if self.is_opposite_lane(lane_map, cur_lane_id, nearby_lane_id):
             return False
@@ -128,6 +131,8 @@ class RampJudge:
     def judge_exit_fork(
         self, lane_map, cur_lane_id, adjacent_lane_id, ego_point
     ):
+        if not self.is_in_lanemap(lane_map, cur_lane_id, adjacent_lane_id):
+            return False
         # 滤除对向车道
         if self.is_opposite_lane(lane_map, cur_lane_id, adjacent_lane_id):
             return False
@@ -164,6 +169,9 @@ class RampJudge:
                 ):
                     return False
         return True
+
+    def is_in_lanemap(self, lane_map, cur_lane_id, nearby_lane_id):
+        return cur_lane_id in lane_map and nearby_lane_id in lane_map
 
     def is_opposite_lane(self, lane_map, cur_lane_id, adjacent_lane_id):
         v1 = lane_map[cur_lane_id]["unit_directions"][0]

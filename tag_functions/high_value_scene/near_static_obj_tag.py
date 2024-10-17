@@ -134,12 +134,19 @@ def check_future_path_bypass(
 def label_narrow_road_tag(data: TagData, params: Dict) -> NarrowRoadTag:
     ego_path_info = data.label_scene.ego_path_info
     obstacles = data.label_scene.obstacles
-    curb_decision = data.label_scene.label_res["curb_label"]["decision"]
-    curbs_lat_decision = curb_decision["interactive_lat_type"]
+    curb_decision = data.label_scene.label_res["curb_label"].get(
+        "decision", None
+    )
     filter = ObstacleFilter()
 
-    if not valid_check(data) or not is_moving(obstacles[-9]):
+    if (
+        curb_decision is None
+        or not valid_check(data)
+        or not is_moving(obstacles[-9])
+    ):
         return NarrowRoadTag()
+
+    curbs_lat_decision = curb_decision["interactive_lat_type"]
 
     # 筛选出静态障碍物，并提前计算其polygon
     static_obs, id_polygon = filter.get_static_obs_polygon(obstacles)
