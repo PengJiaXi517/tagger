@@ -5,13 +5,7 @@ from shapely.geometry import LineString, Point, Polygon
 from base import TagData
 from collections import defaultdict
 
-
-def valid_check(data: TagData) -> bool:
-    if len(data.label_scene.ego_path_info.future_path) < 10:
-        return False
-    return True
-
-#判断是不是一直静止
+# 判断是不是一直静止
 def is_static(obstacle):
     future_states = obstacle["future_trajectory"]["future_states"]
     if len(future_states) < 2:
@@ -22,15 +16,17 @@ def is_static(obstacle):
         return True
     return False
 
-#判断是不是一直在动
+
+# 判断是不是一直在动
 def is_moving(obstacle):
-    future_states = obstacle['future_trajectory']['future_states']
+    future_states = obstacle["future_trajectory"]["future_states"]
     if len(future_states) < 1:
         return not obstacle["features"]["is_still"]
     for state in future_states:
-        if np.linalg.norm([state['vx'], state['vy']]) < 0.5:
+        if np.linalg.norm([state["vx"], state["vy"]]) < 0.5:
             return False
     return True
+
 
 def get_bbox(
     center_x: float,
@@ -121,3 +117,13 @@ def get_curvature(ego_path_info):
     curvature = np.insert(curvature, 0, [curvature[0], curvature[0]], axis=0)
     turn_type = np.insert(turn_type, 0, [turn_type[0], turn_type[0]], axis=0)
     return curvature, turn_type
+
+
+def valid_check(data: TagData) -> bool:
+    ego_path_info = data.label_scene.ego_path_info
+    if len(ego_path_info.future_path) < 20:
+        return False
+    curvature, _ = get_curvature(ego_path_info)
+    if np.abs(curvature).max() > 1.57:
+        return False
+    return True

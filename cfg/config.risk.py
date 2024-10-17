@@ -19,10 +19,11 @@ tag_pipelines = {
         "curvature_th": 0.05,
     },
     "mixed_traffic_tag": {
-        "near_static_obs_dist_strict": 0.75,
-        "near_static_obs_dist_relax": 1.5,
+        "near_moving_obs_dist": 0.75,
     },
-    "yield_vru_tag": {},
+    "yield_vru_tag": {
+        "time_window_bef_stop": 2e6,
+    },
     "ramp_tag": {},
 }
 
