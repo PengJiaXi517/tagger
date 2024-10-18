@@ -238,6 +238,8 @@ def check_front_car(obstacles) -> Union[int, None]:
             ego_s = obstacles[key]["decision"]["ego_s"]
 
     # relative obs s
+    if ego_s is None:
+        return None
     obs_info["s"] -= ego_s
 
     # filter obs

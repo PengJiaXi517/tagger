@@ -46,6 +46,8 @@ def get_front_car_info(obstacles) -> Union[Dict, None]:
             ego_s = obstacles[key]["decision"]["ego_s"]
 
     # relative obs s
+    if ego_s is None:
+        return None
     obs_info["s"] -= ego_s
 
     # filter obs
