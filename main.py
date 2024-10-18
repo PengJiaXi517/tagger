@@ -22,6 +22,8 @@ from tag_functions.high_value_scene.near_static_obj_tag import *
 from tag_functions.high_value_scene.mixed_traffic_tag import *
 from tag_functions.high_value_scene.yield_vru_tag import *
 from tag_functions.high_value_scene.ramp_tag import *
+from tag_functions.park_tag import *
+from tag_functions.wait_traffic_light_tag import *
 from utils.config import Config
 
 
