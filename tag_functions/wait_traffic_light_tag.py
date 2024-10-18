@@ -90,19 +90,19 @@ def traffic_start_slow_check(data: TagData, params: Dict) -> Dict:
     # 1. get ego velocity
     ego_vx = data.label_scene.obstacles[-9]["features"]["history_states"][-1]["vx"]
     ego_vy = data.label_scene.obstacles[-9]["features"]["history_states"][-1]["vy"]
-    wait_traffic_light_tag.ego_velocity = (ego_vx**2 + ego_vy**2) ** 0.5
+    wait_traffic_light_tag.ego_velocity = float((ego_vx**2 + ego_vy**2) ** 0.5)
 
     # 2. get dis to stopline
-    wait_traffic_light_tag.dis_to_stopline = data.label_scene.label_res["frame_info"][
+    wait_traffic_light_tag.dis_to_stopline = float(data.label_scene.label_res["frame_info"][
         "ego_curr_status"
-    ]["dis_to_stopline_by_polygon"]
-
+    ]["dis_to_stopline_by_polygon"])
+    
     # 3. get front car info
     front_car_info = get_front_car_info(data.label_scene.obstacles)
     if front_car_info is not None:
-        wait_traffic_light_tag.dis_to_front_car = front_car_info["s"]
-        wait_traffic_light_tag.front_car_id = front_car_info["key"]
-        wait_traffic_light_tag.front_car_velocity = front_car_info["v"]
+        wait_traffic_light_tag.dis_to_front_car = float(front_car_info["s"])
+        wait_traffic_light_tag.front_car_id = int(front_car_info["key"])
+        wait_traffic_light_tag.front_car_velocity = float(front_car_info["v"])
 
     # 4. check if start slow
     if (

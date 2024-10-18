@@ -188,9 +188,9 @@ def check_future_change_path(label_res, ego_obs_seq_info) -> bool:
 
     # check if change path in future
     if current_lane is not None:
-        check_change_path = np.any(
+        check_change_path = bool(np.any(
             np.isin(ego_lanes, nearby_lanes) & (ego_lanes != current_lane)
-        )
+        ))
     else:
         check_change_path = False
 
@@ -248,7 +248,7 @@ def check_front_car(obstacles) -> Union[int, None]:
     # find argmin obs_s
     if len(filtered_obs_info) > 0:
         min_obs = filtered_obs_info[np.argmin(filtered_obs_info["s"])]
-        return min_obs["key"]
+        return int(min_obs["key"])
     else:
         return None
 
@@ -258,9 +258,7 @@ class ParkTag:
     abnormal_park: bool = None
     ego_velocity: float = None
     dis_to_stopline: float = None
-    dis_to_front_car: float = None
     front_car_id: int = None
-    front_car_velocity: float = None
     future_change_path: bool = None
     is_on_rightmost_lane: bool = None
     aabox: dict = field(default_factory=dict)
@@ -288,15 +286,15 @@ def park_check(data: TagData, params: Dict) -> Dict:
     assert len(data.label_scene.obstacles[-9]["features"]["history_states"]) > 0
 
     # 1. get ego velocity
-    park_tag.ego_velocity = (
+    park_tag.ego_velocity = float((
         data.label_scene.obstacles[-9]["features"]["history_states"][-1]["vx"] ** 2
         + data.label_scene.obstacles[-9]["features"]["history_states"][-1]["vy"] ** 2
-    ) ** 0.5
+    ) ** 0.5)
 
     # 2. get ego dis to stopline (logic based on autolabeler)
-    park_tag.dis_to_stopline = data.label_scene.label_res["frame_info"][
+    park_tag.dis_to_stopline = float(data.label_scene.label_res["frame_info"][
         "ego_curr_status"
-    ]["dis_to_stopline_by_polygon"]
+    ]["dis_to_stopline_by_polygon"])
 
     # 3. check if on rightmost lane
     #   a. get rightmost from auto_labeler
