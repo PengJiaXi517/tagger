@@ -13,6 +13,18 @@ tag_pipelines = {
         "sample_point_length": 1.0,
     },
     "interactive_tag": {},
+    "near_static_obj_tag": {
+        "near_static_obs_dist_strict": 0.9,
+        "near_static_obs_dist_relax": 1.5,
+        "curvature_th": 0.05,
+    },
+    "mixed_traffic_tag": {
+        "near_moving_obs_dist": 0.75,
+    },
+    "yield_vru_tag": {
+        "time_window_bef_stop": 2e6,
+    },
+    "ramp_tag": {},
 }
 
 max_valid_point_num = 100
