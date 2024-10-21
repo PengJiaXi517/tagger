@@ -3,7 +3,7 @@ from enum import Enum
 from typing import Dict, List, Tuple
 
 import numpy as np
-from shapely.geometry import LineString, Point
+from shapely.geometry import LineString, Point, Polygon
 
 from base import PercepMap, TagData
 from registry import TAG_FUNCTIONS
@@ -181,6 +181,7 @@ class FuturePathTag:
     junction_path_tag: JunctionPATHTag = None
     condition_res_tag: ConditionResTag = None
     is_backing_up: bool = False
+    is_right_turn_only: bool = False
 
     def as_dict(self):
         return {
@@ -211,6 +212,7 @@ class FuturePathTag:
                 else None
             ),
             "is_backing_up": self.is_backing_up,
+            "is_right_turn_only": self.is_right_turn_only,
         }
 
 
@@ -246,7 +248,8 @@ def label_cruise_tag(
         )
 
         polylines = [
-            LineString(percep_map.lane_map[lane_id]["polyline"]) for lane_id in lane_seq
+            LineString(percep_map.lane_map[lane_id]["polyline"])
+            for lane_id in lane_seq
         ]
 
         pose_ls = []
@@ -293,7 +296,8 @@ def label_lc_tag(
 
     for lane_seq in arrive_on_nearby_lane_seq:
         polylines = [
-            LineString(percep_map.lane_map[lane_id]["polyline"]) for lane_id in lane_seq
+            LineString(percep_map.lane_map[lane_id]["polyline"])
+            for lane_id in lane_seq
         ]
 
         first_arrive_lane_seq_idx = num_points_on_lane - 1
@@ -345,8 +349,59 @@ JUNCTION_GOAL_2_TURN_TYPE = {
 }
 
 
+def is_near_junction(future_path, lane_map, junction_map, current_lanes):
+    if (
+        len(future_path) < 1
+        or len(current_lanes) == 0
+        or current_lanes[0] not in lane_map
+    ):
+        return False
+
+    ego_point = Point(future_path[0])
+    nearest_junction = min(
+        (
+            (id, Polygon(junction["polygon"]).distance(ego_point))
+            for id, junction in junction_map.items()
+            if junction["type"] == "IN_ROAD"
+        ),
+        key=lambda x: x[1],
+        default=(None, float("inf")),
+    )
+
+    if nearest_junction[1] >= 40 or nearest_junction[0] is None:
+        return False
+
+    if not junction_map[nearest_junction[0]]["pd_intersection"]:
+        return False
+
+    if (
+        LineString(lane_map[current_lanes[0]]["polyline"]).distance(
+            Polygon(junction_map[nearest_junction[0]]["polygon"])
+        )
+        > 8
+    ):
+        return False
+
+    all_junction_lanes = set(
+        lane_id
+        for group in junction_map[nearest_junction[0]]["entry_groups"]
+        + junction_map[nearest_junction[0]]["exit_groups"]
+        for lane_id in group
+    )
+
+    if any(
+        current_lane in all_junction_lanes for current_lane in current_lanes
+    ):
+        return False
+
+    return True
+
+
 def label_junction_tag(
-    data: TagData, params: Dict, percep_map: PercepMap, sample_point_length: float = 3.0
+    data: TagData,
+    params: Dict,
+    percep_map: PercepMap,
+    sample_point_length: float = 3.0,
 ) -> JunctionPATHTag:
     junction_path_tag = JunctionPATHTag()
 
@@ -390,7 +445,9 @@ def label_junction_tag(
             for lane_id, pose_l in final_entry_corr_lane_ids:
                 if lane_id == nearest_lane_id:
                     junction_path_tag.has_real_arrive_entry_lane = True
-                    junction_path_tag.real_lane_entry_pose_l = float(np.abs(pose_l))
+                    junction_path_tag.real_lane_entry_pose_l = float(
+                        np.abs(pose_l)
+                    )
                     break
 
     if len(junction_label_info.exit_lanes) > 0:
@@ -453,7 +510,9 @@ def label_junction_tag(
                     max_length_not_in_exit_lane += sample_point_length
 
             junction_path_tag.max_length_in_exit_lane = max_length_in_exit_lane
-            junction_path_tag.max_length_not_in_exit_lane = max_length_not_in_exit_lane
+            junction_path_tag.max_length_not_in_exit_lane = (
+                max_length_not_in_exit_lane
+            )
 
         if len(after_in_junction_idx) > 0:
             pose_ls = []
@@ -481,6 +540,37 @@ def label_backing_up_tag(data: TagData, params: Dict) -> bool:
     return not data.label_scene.ego_path_info.future_path_linestring.is_simple
 
 
+def label_right_turn_only_tag(data: TagData, future_path_tag: FuturePathTag):
+    if future_path_tag.path_type not in [
+        FuturePATHType.CRUISE,
+        FuturePATHType.LANE_CHANGE,
+        FuturePATHType.UNKNOWN,
+    ]:
+        return False
+
+    if not data.label_scene.label_res["frame_info"]["ego_curr_status"][
+        "is_rightmost"
+    ]:
+        return False
+
+    if future_path_tag.basic_path_tag.sum_path_curvature > -0.2:
+        return False
+
+    in_junction_id = data.label_scene.ego_path_info.in_junction_id
+    future_path = data.label_scene.ego_path_info.future_path
+    junction_map = data.label_scene.percepmap.junction_map
+    lane_map = data.label_scene.percepmap.lane_map
+    current_lanes = data.label_scene.ego_obs_lane_seq_info.current_lanes
+
+    if any(obj is not None for obj in in_junction_id):
+        return False
+
+    if not is_near_junction(future_path, lane_map, junction_map, current_lanes):
+        return False
+
+    return True
+
+
 def judge_path_type(data: TagData, params: Dict) -> FuturePATHType:
 
     lane_seq_info = data.label_scene.ego_obs_lane_seq_info
@@ -493,7 +583,9 @@ def judge_path_type(data: TagData, params: Dict) -> FuturePATHType:
             ego_path_info.corr_lane_id, ego_path_info.in_junction_id
         ):
             if corr_lane_ids is not None:
-                if any([lane_id in lane_seq for lane_id, pose_l in corr_lane_ids]):
+                if any(
+                    [lane_id in lane_seq for lane_id, pose_l in corr_lane_ids]
+                ):
                     on_curr_lane_seq = True
                 else:
                     on_curr_lane_seq = False
@@ -509,7 +601,9 @@ def judge_path_type(data: TagData, params: Dict) -> FuturePATHType:
             ego_path_info.corr_lane_id, ego_path_info.in_junction_id
         ):
             if corr_lane_ids is not None:
-                if any([lane_id in lane_seq for lane_id, pose_l in corr_lane_ids]):
+                if any(
+                    [lane_id in lane_seq for lane_id, pose_l in corr_lane_ids]
+                ):
                     on_curr_lane_seq = True
                 else:
                     on_curr_lane_seq = False
@@ -575,7 +669,9 @@ applyall = np.vectorize(normal_angle)
 
 
 def label_basic_tag(data: TagData, params: Dict) -> BasicPathTag:
-    def cal_curvature(future_path: List[Tuple[float, float]]) -> Tuple[float, ...]:
+    def cal_curvature(
+        future_path: List[Tuple[float, float]]
+    ) -> Tuple[float, ...]:
         if len(future_path) <= 4:
             return 0.0, 0.0, 0.0, 0.0
         path_points = np.array(future_path)
@@ -604,7 +700,9 @@ def label_basic_tag(data: TagData, params: Dict) -> BasicPathTag:
     )
 
     basic_path_tag = BasicPathTag()
-    basic_path_tag.valid_path_len = len(data.label_scene.ego_path_info.future_path)
+    basic_path_tag.valid_path_len = len(
+        data.label_scene.ego_path_info.future_path
+    )
     basic_path_tag.sum_path_curvature = sum_curvature
     basic_path_tag.abs_sum_path_curvature = abs_curvature
     basic_path_tag.pos_sum_path_curvature = pos_curvature
@@ -662,6 +760,10 @@ def future_path_tag(data: TagData, params: Dict) -> Dict:
             percep_map,
             params["sample_point_length"],
         )
+
+    future_path_tag.is_right_turn_only = label_right_turn_only_tag(
+        data, future_path_tag
+    )
 
     future_path_tag.condition_res_tag = label_condition_res_tag(data, params)
 
