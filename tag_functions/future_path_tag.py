@@ -127,6 +127,18 @@ class ConditionResTag:
         }
 
 
+@dataclass
+class RightTurnOnlyTag:
+    is_right_turn_only: bool = False
+    right_turn_only_valid_path_len: int = 0
+
+    def as_dict(self):
+        return {
+            "is_right_turn_only": self.is_right_turn_only,
+            "right_turn_only_valid_path_len": self.right_turn_only_valid_path_len,
+        }
+
+
 def label_condition_res_tag(data: TagData, params: Dict) -> ConditionResTag:
     condition_pair = data.condition_res.lane_seq_pair
     lane_seq_ids = data.condition_res.seq_lane_ids_raw
@@ -180,8 +192,8 @@ class FuturePathTag:
     lc_path_tag: List[LcPATHTag] = None
     junction_path_tag: JunctionPATHTag = None
     condition_res_tag: ConditionResTag = None
+    right_turn_only_tag: RightTurnOnlyTag = None
     is_backing_up: bool = False
-    is_right_turn_only: bool = False
 
     def as_dict(self):
         return {
@@ -211,8 +223,12 @@ class FuturePathTag:
                 if self.condition_res_tag is not None
                 else None
             ),
+            "right_turn_only_tag": (
+                self.right_turn_only_tag.as_dict()
+                if self.right_turn_only_tag is not None
+                else None
+            ),
             "is_backing_up": self.is_backing_up,
-            "is_right_turn_only": self.is_right_turn_only,
         }
 
 
@@ -541,6 +557,37 @@ def label_backing_up_tag(data: TagData, params: Dict) -> bool:
 
 
 def label_right_turn_only_tag(data: TagData, future_path_tag: FuturePathTag):
+    right_turn_only_tag = RightTurnOnlyTag()
+
+    if is_right_turn_only_scene(data, future_path_tag):
+        right_turn_only_tag.is_right_turn_only = True
+
+        current_lane_seqs = (
+            data.label_scene.ego_obs_lane_seq_info.current_lane_seqs
+        )
+        lane_map = data.label_scene.percepmap.lane_map
+        future_path = data.label_scene.ego_path_info.future_path
+
+        if len(current_lane_seqs) == 1:
+            lane_seq_linestring = LineString(
+                [
+                    point
+                    for lane_id in current_lane_seqs[0]
+                    for point in lane_map[lane_id]["polyline"]
+                ]
+            )
+            valid_len = 0
+            for idx, point in enumerate(future_path):
+                dist = Point(point).distance(lane_seq_linestring)
+                if dist <= 0.5:
+                    valid_len = idx 
+                if dist >= 1.75:
+                    right_turn_only_tag.right_turn_only_valid_path_len = max(valid_len - 5, 0)
+                    break
+    return right_turn_only_tag
+
+
+def is_right_turn_only_scene(data: TagData, future_path_tag: FuturePathTag):
     if future_path_tag.path_type not in [
         FuturePATHType.CRUISE,
         FuturePATHType.LANE_CHANGE,
@@ -761,7 +808,7 @@ def future_path_tag(data: TagData, params: Dict) -> Dict:
             params["sample_point_length"],
         )
 
-    future_path_tag.is_right_turn_only = label_right_turn_only_tag(
+    future_path_tag.right_turn_only_tag = label_right_turn_only_tag(
         data, future_path_tag
     )
 
