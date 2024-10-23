@@ -6,7 +6,7 @@ import numpy as np
 from shapely.geometry import LineString, Point, Polygon
 
 from base import PercepMap, TagData
-from registry import TAG_FUNCTIONS
+# from registry import TAG_FUNCTIONS
 
 
 @dataclass(repr=False)
@@ -562,28 +562,21 @@ def label_right_turn_only_tag(data: TagData, future_path_tag: FuturePathTag):
     if is_right_turn_only_scene(data, future_path_tag):
         right_turn_only_tag.is_right_turn_only = True
 
-        current_lane_seqs = (
-            data.label_scene.ego_obs_lane_seq_info.current_lane_seqs
-        )
-        lane_map = data.label_scene.percepmap.lane_map
-        future_path = data.label_scene.ego_path_info.future_path
+        current_lanes = data.label_scene.ego_obs_lane_seq_info.current_lanes
 
-        if len(current_lane_seqs) == 1:
-            lane_seq_linestring = LineString(
-                [
-                    point
-                    for lane_id in current_lane_seqs[0]
-                    for point in lane_map[lane_id]["polyline"]
-                ]
-            )
+        if len(current_lanes) == 1:
+            lane_map = data.label_scene.percepmap.lane_map
+            future_path = data.label_scene.ego_path_info.future_path
+            lane_seq_linestring = LineString(lane_map[current_lanes[0]]["polyline"])
+            
             valid_len = 0
             for idx, point in enumerate(future_path):
                 dist = Point(point).distance(lane_seq_linestring)
                 if dist <= 0.5:
                     valid_len = idx 
                 if dist >= 1.75:
-                    right_turn_only_tag.right_turn_only_valid_path_len = max(valid_len - 5, 0)
                     break
+            right_turn_only_tag.right_turn_only_valid_path_len = max(valid_len - 5, 0)
     return right_turn_only_tag
 
 
@@ -758,7 +751,7 @@ def label_basic_tag(data: TagData, params: Dict) -> BasicPathTag:
     return basic_path_tag
 
 
-@TAG_FUNCTIONS.register()
+# @TAG_FUNCTIONS.register()
 def future_path_tag(data: TagData, params: Dict) -> Dict:
     future_path_tag = FuturePathTag()
     percep_map = data.label_scene.percepmap
@@ -816,4 +809,4 @@ def future_path_tag(data: TagData, params: Dict) -> Dict:
 
     future_path_tag.is_backing_up = label_backing_up_tag(data, params)
 
-    return future_path_tag.as_dict()
+    return future_path_tag

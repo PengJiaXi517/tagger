@@ -1,7 +1,8 @@
 from dataclasses import dataclass, field
 from typing import Dict, List, Tuple
 from base import TagData
-from registry import TAG_FUNCTIONS
+
+# from registry import TAG_FUNCTIONS
 from tag_functions.high_value_scene.hv_utils.ramp_judge import RampJudge
 from tag_functions.high_value_scene.hv_utils.obstacle_filter import (
     ObstacleFilter,
@@ -25,7 +26,7 @@ class RampTag:
 
 
 # 判断汇入汇出匝道
-@TAG_FUNCTIONS.register()
+# @TAG_FUNCTIONS.register()
 def ramp_tag(data: TagData, params: Dict) -> Dict:
     ramp_tag = RampTag()
     ramp_judge = RampJudge()
@@ -47,7 +48,7 @@ def ramp_tag(data: TagData, params: Dict) -> Dict:
         or not valid_check(data)
         or not ramp_judge.pre_check(lane_map, current_lanes, current_lane_seqs)
     ):
-        return ramp_tag.as_dict()
+        return ramp_tag
 
     # 判断进匝道, 情况一: cruise场景下lane一分为二，且有curb隔开
     # 情况二: lc场景下，当前车道和目标车道间有curb隔开
@@ -61,4 +62,4 @@ def ramp_tag(data: TagData, params: Dict) -> Dict:
     elif ramp_judge.exit_ramp(lane_map, current_lanes, ego_point):
         ramp_tag.is_exit_ramp = True
 
-    return ramp_tag.as_dict()
+    return ramp_tag

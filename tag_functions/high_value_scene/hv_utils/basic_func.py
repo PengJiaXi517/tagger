@@ -127,3 +127,24 @@ def valid_check(data: TagData) -> bool:
     if np.abs(curvature).max() > 1.57:
         return False
     return True
+
+
+def get_sl(path, path_point):
+    proj_s = path.project(path_point)
+    if 0 < proj_s < path.length:
+        proj_l = path.distance(path_point)
+        coords = np.array(path.coords)
+        point_coords = np.array(path_point.coords[0])
+        distances = np.linalg.norm(coords - point_coords, axis=1)
+        seg_idx = min(np.argmin(distances).item(), len(path.coords) - 2)
+        if (
+            np.cross(
+                np.array(path.coords[seg_idx + 1])
+                - np.array(path.coords[seg_idx]),
+                np.array(path_point.coords[0]) - np.array(path.coords[seg_idx]),
+            )
+            < 0
+        ):
+            proj_l = -proj_l
+        return proj_s, proj_l
+    return None, None

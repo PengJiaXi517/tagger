@@ -5,6 +5,7 @@ from shapely.geometry import LineString, Point, Polygon
 class CollisionDetector:
     def __init__(self, params):
         self.params = params
+        self.big_car_area = 18
 
     def check_collision_curb(
         self, veh_polygon, curbs_linestring, curb_lat_decision
@@ -79,20 +80,30 @@ class CollisionDetector:
             "has_moving_obs_right": False,
         }
 
-        for k, v in obstacles.items():
-            if k == -9:
+        for id, obs in obstacles.items():
+            if id == -9:
                 continue
-            lat_decision = v["decision"]["interactive_lat_type"]
+            lat_decision = obs["decision"]["interactive_lat_type"]
             if lat_decision == 0:
                 continue
-            if k not in id_polygon:
+            if id not in id_polygon:
                 continue
-            obs_polygon = id_polygon[k]
+            obs_polygon = id_polygon[id]
 
+            dist_th = self.params.near_moving_obs_dist
             if (
-                veh_polygon.distance(obs_polygon)
-                < self.params.near_moving_obs_dist
+                obs["features"]["type"] == "VEHICLE"
+                and obs["features"]["length"] * obs["features"]["width"]
+                > self.big_car_area
             ):
+                dist_th = self.params.near_caution_obs_dist
+            elif (
+                obs["features"]["type"] == "PEDESTRIAN"
+                or obs["features"]["type"] == "BICYCLE"
+            ):
+                dist_th = self.params.near_caution_obs_dist
+
+            if veh_polygon.distance(obs_polygon) < dist_th:
                 if lat_decision == 1:
                     collision_info["has_moving_obs_right"] = True
                 elif lat_decision == 2:

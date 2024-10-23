@@ -2,7 +2,8 @@ from dataclasses import dataclass, field
 from typing import Dict, List, Tuple
 from shapely.geometry import LineString, Point, Polygon
 from base import TagData
-from registry import TAG_FUNCTIONS
+
+# from registry import TAG_FUNCTIONS
 from tag_functions.high_value_scene.hv_utils.collision_detector import (
     CollisionDetector,
 )
@@ -62,17 +63,17 @@ def label_mixed_traffic_tag(obstacles, moving_obs, future_obs_polygon, params):
     mixed_traffic_tag.is_mixed_traffic = any(
         [any(obj) for obj in mixed_traffic_tag.future_mixed_traffic]
     )
-    return mixed_traffic_tag.as_dict()
+    return mixed_traffic_tag
 
 
 # 判断8s内是否与动目标距离过近
-@TAG_FUNCTIONS.register()
+# @TAG_FUNCTIONS.register()
 def mixed_traffic_tag(data: TagData, params: Dict) -> Dict:
     mixed_traffic_tag = MixedTrafficTag()
     obstacles = data.label_scene.obstacles
 
     if not valid_check(data) or not is_moving(obstacles[-9]):
-        return mixed_traffic_tag.as_dict()
+        return mixed_traffic_tag
 
     # 筛选出动态障碍物
     filter = ObstacleFilter()

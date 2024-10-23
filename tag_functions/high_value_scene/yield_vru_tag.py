@@ -3,7 +3,8 @@ from typing import Dict, List, Tuple
 import numpy as np
 from shapely.geometry import LineString, Point, Polygon
 from base import TagData
-from registry import TAG_FUNCTIONS
+
+# from registry import TAG_FUNCTIONS
 from tag_functions.high_value_scene.hv_utils.obstacle_filter import (
     ObstacleFilter,
 )
@@ -81,11 +82,11 @@ def check_intersection(
 
 
 # 判断是否在礼让vru而减速
-@TAG_FUNCTIONS.register()
+# @TAG_FUNCTIONS.register()
 def yield_vru_tag(data: TagData, params: Dict) -> Dict:
     yield_vru_tag = YieldVRUTag()
     if not valid_check(data):
-        return yield_vru_tag.as_dict()
+        return yield_vru_tag
 
     obstacles = data.label_scene.obstacles
     future_path_linestring = (
@@ -98,12 +99,12 @@ def yield_vru_tag(data: TagData, params: Dict) -> Dict:
         ego_future_states
     )
     if not is_braking or stop_point is None:
-        return yield_vru_tag.as_dict()
+        return yield_vru_tag
 
     # 判断刹停点前方是否有车辆
     filter = ObstacleFilter()
     if filter.vehicle_in_front(obstacles, stop_point, stop_idx):
-        return yield_vru_tag.as_dict()
+        return yield_vru_tag
 
     # 判断vru future_states与ego future_path是否相交，计算交点与刹停点的距离
     if check_intersection(
@@ -116,4 +117,4 @@ def yield_vru_tag(data: TagData, params: Dict) -> Dict:
     ):
         yield_vru_tag.is_yield_vru = True
 
-    return yield_vru_tag.as_dict()
+    return yield_vru_tag
