@@ -6,6 +6,10 @@ import numpy as np
 from shapely.geometry import LineString, Point, Polygon
 
 from base import PercepMap, TagData
+from tag_functions.high_value_scene.hv_utils.basic_func import (
+    get_sl,
+)
+
 # from registry import TAG_FUNCTIONS
 
 
@@ -365,15 +369,13 @@ JUNCTION_GOAL_2_TURN_TYPE = {
 }
 
 
-def is_near_junction(future_path, lane_map, junction_map, current_lanes):
-    if (
-        len(future_path) < 1
-        or len(current_lanes) == 0
-        or current_lanes[0] not in lane_map
-    ):
+def is_near_junction(
+    future_path_linestring, lane_map, junction_map, current_lanes
+):
+    if future_path_linestring.length < 3:
         return False
 
-    ego_point = Point(future_path[0])
+    ego_point = Point(future_path_linestring.coords[0])
     nearest_junction = min(
         (
             (id, Polygon(junction["polygon"]).distance(ego_point))
@@ -384,14 +386,14 @@ def is_near_junction(future_path, lane_map, junction_map, current_lanes):
         default=(None, float("inf")),
     )
 
-    if nearest_junction[1] >= 40 or nearest_junction[0] is None:
+    if nearest_junction[1] >= 50 or nearest_junction[0] is None:
         return False
 
     if not junction_map[nearest_junction[0]]["pd_intersection"]:
         return False
 
     if (
-        LineString(lane_map[current_lanes[0]]["polyline"]).distance(
+        future_path_linestring.distance(
             Polygon(junction_map[nearest_junction[0]]["polygon"])
         )
         > 8
@@ -400,12 +402,11 @@ def is_near_junction(future_path, lane_map, junction_map, current_lanes):
 
     all_junction_lanes = set(
         lane_id
-        for group in junction_map[nearest_junction[0]]["entry_groups"]
-        + junction_map[nearest_junction[0]]["exit_groups"]
+        for group in junction_map[nearest_junction[0]]["exit_groups"]
         for lane_id in group
     )
 
-    if any(
+    if len(all_junction_lanes) == 0 or any(
         current_lane in all_junction_lanes for current_lane in current_lanes
     ):
         return False
@@ -556,27 +557,84 @@ def label_backing_up_tag(data: TagData, params: Dict) -> bool:
     return not data.label_scene.ego_path_info.future_path_linestring.is_simple
 
 
+def get_target_lane_seq_linestring(
+    lane_map,
+    current_lane_seqs,
+    future_path,
+    lane_seq_pair,
+    seq_lane_ids,
+    valid_ind,
+):
+    target_lane_seq_linestring = None
+
+    select_ind = np.random.choice(valid_ind)
+    start_ind, end_ind, _ = lane_seq_pair[select_ind]
+
+    condition_lane_polyline = []
+    for ind in [start_ind, end_ind]:
+        if ind != -1:
+            for lane_id in seq_lane_ids[ind]:
+                lane = lane_map.get(lane_id, None)
+                if lane is not None:
+                    condition_lane_polyline += lane["polyline"]
+
+    if len(condition_lane_polyline) > 2:
+        target_lane_seq_linestring = LineString(condition_lane_polyline)
+
+    _, proj_l = get_sl(target_lane_seq_linestring, Point(future_path[0]))
+    if proj_l is not None and proj_l < -1.75:
+        if len(current_lane_seqs) == 0:
+            target_lane_seq_linestring = None
+        else:
+            current_lane_sequence_points = [
+                point
+                for lane_id in current_lane_seqs[0]
+                for point in lane_map[lane_id]["polyline"]
+            ]
+            target_lane_seq_linestring = LineString(
+                current_lane_sequence_points
+            )
+
+    return target_lane_seq_linestring
+
+
 def label_right_turn_only_tag(data: TagData, future_path_tag: FuturePathTag):
     right_turn_only_tag = RightTurnOnlyTag()
 
-    if is_right_turn_only_scene(data, future_path_tag):
+    lane_seq_pair = data.condition_res.lane_seq_pair
+    seq_lane_ids = data.condition_res.seq_lane_ids
+    lane_map = data.label_scene.percepmap.lane_map
+    future_path = data.label_scene.ego_path_info.future_path
+    current_lane_seqs = data.label_scene.ego_obs_lane_seq_info.current_lane_seqs
+
+    valid_ind = [
+        i
+        for i in range(len(lane_seq_pair))
+        if lane_seq_pair[i][0] != -1 or lane_seq_pair[i][1] != -1
+    ]
+
+    if len(valid_ind) > 0 and is_right_turn_only_scene(data, future_path_tag):
         right_turn_only_tag.is_right_turn_only = True
 
-        current_lanes = data.label_scene.ego_obs_lane_seq_info.current_lanes
+        target_lane_seq_linestring = get_target_lane_seq_linestring(
+            lane_map,
+            current_lane_seqs,
+            future_path,
+            lane_seq_pair,
+            seq_lane_ids,
+            valid_ind,
+        )
 
-        if len(current_lanes) == 1:
-            lane_map = data.label_scene.percepmap.lane_map
-            future_path = data.label_scene.ego_path_info.future_path
-            lane_seq_linestring = LineString(lane_map[current_lanes[0]]["polyline"])
-            
+        if target_lane_seq_linestring is not None:
             valid_len = 0
+
             for idx, point in enumerate(future_path):
-                dist = Point(point).distance(lane_seq_linestring)
-                if dist <= 0.5:
-                    valid_len = idx 
-                if dist >= 1.75:
-                    break
-            right_turn_only_tag.right_turn_only_valid_path_len = max(valid_len - 5, 0)
+                if Point(point).distance(target_lane_seq_linestring) <= 0.5:
+                    valid_len = idx
+            right_turn_only_tag.right_turn_only_valid_path_len = max(
+                valid_len - 5, 0
+            )
+
     return right_turn_only_tag
 
 
@@ -588,16 +646,13 @@ def is_right_turn_only_scene(data: TagData, future_path_tag: FuturePathTag):
     ]:
         return False
 
-    if not data.label_scene.label_res["frame_info"]["ego_curr_status"][
-        "is_rightmost"
-    ]:
-        return False
-
     if future_path_tag.basic_path_tag.sum_path_curvature > -0.2:
         return False
 
     in_junction_id = data.label_scene.ego_path_info.in_junction_id
-    future_path = data.label_scene.ego_path_info.future_path
+    future_path_linestring = (
+        data.label_scene.ego_path_info.future_path_linestring
+    )
     junction_map = data.label_scene.percepmap.junction_map
     lane_map = data.label_scene.percepmap.lane_map
     current_lanes = data.label_scene.ego_obs_lane_seq_info.current_lanes
@@ -605,7 +660,9 @@ def is_right_turn_only_scene(data: TagData, future_path_tag: FuturePathTag):
     if any(obj is not None for obj in in_junction_id):
         return False
 
-    if not is_near_junction(future_path, lane_map, junction_map, current_lanes):
+    if not is_near_junction(
+        future_path_linestring, lane_map, junction_map, current_lanes
+    ):
         return False
 
     return True
