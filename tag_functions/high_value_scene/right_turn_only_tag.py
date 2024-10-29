@@ -87,7 +87,9 @@ class RightTurnOnlyTagHelper:
         )
         condition_lane_is_in_left = False
 
-        for linestring in target_linestring:
+        for linestring in (
+            target_linestring if target_linestring is not None else []
+        ):
             _, proj_l = xy_to_sl(linestring, Point(future_path[0]))
             if proj_l < -1.75:
                 condition_lane_is_in_left = True
