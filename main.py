@@ -11,16 +11,21 @@ from tqdm import tqdm
 
 from base import ConditionRes, LabelScene, TagData
 from registry import TAG_FUNCTIONS
-from tag_functions.condition_risk import *
-from tag_functions.demo import *
-from tag_functions.ego_state import *
-# from tag_functions.future_path_tag import *
-from tag_functions.interactive_tag import *
-from tag_functions.map_risk import *
-from tag_functions.path_risk import *
-from tag_functions.high_value_scene.high_value_tag import *
-from tag_functions.park_tag import *
-from tag_functions.wait_traffic_light_tag import *
+from tag_functions.condition_risk import condition_risk_check
+from tag_functions.demo import demo
+from tag_functions.ego_state import (
+    ego_state_location,
+    ego_state_speed,
+    ego_state_occ_environment,
+    ego_state_map_environment,
+    ego_state_obs_environment,
+)
+from tag_functions.interactive_tag import interactive_tag
+from tag_functions.map_risk import map_risk
+from tag_functions.path_risk import path_risk
+from tag_functions.high_value_tag import label_high_value_tag
+from tag_functions.park_tag import park_check
+from tag_functions.wait_traffic_light_tag import traffic_start_slow_check
 from utils.config import Config
 
 

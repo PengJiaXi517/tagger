@@ -1,22 +1,26 @@
 from typing import Dict, List, Tuple
 from shapely.geometry import LineString, Point, Polygon
 import numpy as np
+from base import EgoPathInfo
 
 
-class RampJudge:
-    def __init__(self):
-        self.enter_fork_consider_len = 20  # 考虑的index数量
-        self.exit_fork_consider_len = 50
-        self.large_dist_th = 10
-        self.large_dist_num_th = 3
-        self.curb_roi_s_min = -10
-        self.curb_roi_s_max = 100
-        self.curb_roi_l_max = 10
+class RampTagHelper:
+    def __init__(self) -> None:
+        self.enter_fork_consider_len: int = 20  # 考虑的index数量
+        self.exit_fork_consider_len: int = 50
+        self.large_dist_th: int = 10
+        self.large_dist_num_th: int = 3
+        self.curb_roi_s_min: int = -10
+        self.curb_roi_s_max: int = 100
+        self.curb_roi_l_max: int = 10
 
-    def enter_ramp_cruise(self, lane_map, current_lanes, curb_decision):
+    def enter_ramp_cruise(
+        self, lane_map: Dict, current_lanes: List[int], curb_decision: Dict
+    ) -> bool:
         fork_lane_ids = []
         cur_lane_id = current_lanes[0]
         succ_ids = lane_map[cur_lane_id]["successor_id"]
+
         # 判断lane是否为 一分成二
         if len(succ_ids) == 2:
             fork_lane_ids = succ_ids
@@ -37,12 +41,12 @@ class RampJudge:
 
     def enter_ramp_lane_change(
         self,
-        lane_map,
-        current_lanes,
-        curb_decision,
-        current_lane_seqs,
-        ego_path_info,
-    ):
+        lane_map: Dict,
+        current_lanes: List[int],
+        curb_decision: Dict,
+        current_lane_seqs: List[List[int]],
+        ego_path_info: EgoPathInfo,
+    ) -> bool:
         corr_lane_id = ego_path_info.corr_lane_id
         future_path = ego_path_info.future_path
 
@@ -50,7 +54,7 @@ class RampJudge:
         if any(obj is not None for obj in ego_path_info.in_junction_id):
             return False
 
-        # 判断是否为变道场景
+        # 拿到变道后到达的lane id以及对应的点在future path上的index
         target_lane_id = -1
         lc_idx = -1
         for idx, lane_info in enumerate(corr_lane_id):
@@ -76,9 +80,12 @@ class RampJudge:
 
         return False
 
-    def exit_ramp(self, lane_map, current_lanes, ego_point):
+    def exit_ramp(
+        self, lane_map: Dict, current_lanes: List[int], ego_point: Point
+    ) -> bool:
         cur_lane_id = current_lanes[0]
         succ_ids = lane_map[cur_lane_id]["successor_id"]
+
         # 判断lane是否为 二合成一
         if len(succ_ids) == 1:
             pred_ids = lane_map[succ_ids[0]]["predecessor_id"]
@@ -95,20 +102,22 @@ class RampJudge:
 
     def judge_enter_fork(
         self,
-        lane_map,
-        cur_lane_id,
-        nearby_lane_id,
-        curb_decision,
+        lane_map: Dict,
+        cur_lane_id: int,
+        nearby_lane_id: int,
+        curb_decision: Dict,
         lc_point=None,
-    ):
+    ) -> bool:
         # 检查两条lane id是否在lane_map中
-        if not self.is_in_lanemap(lane_map, cur_lane_id, nearby_lane_id):
+        if not self.is_laneid_in_lanemap(lane_map, cur_lane_id, nearby_lane_id):
             return False
+
         # 滤除对向车道
-        if self.is_opposite_lane(lane_map, cur_lane_id, nearby_lane_id):
+        if self.is_opposite_lanes(lane_map, cur_lane_id, nearby_lane_id):
             return False
+
         # 滤除虚拟车道
-        if self.is_virtual_lane(lane_map, cur_lane_id, nearby_lane_id):
+        if self.is_virtual_lanes(lane_map, cur_lane_id, nearby_lane_id):
             return False
 
         cur_lane = lane_map[cur_lane_id]["polyline"]
@@ -129,19 +138,27 @@ class RampJudge:
         )
 
     def judge_exit_fork(
-        self, lane_map, cur_lane_id, adjacent_lane_id, ego_point
-    ):
-        if not self.is_in_lanemap(lane_map, cur_lane_id, adjacent_lane_id):
+        self,
+        lane_map: Dict,
+        cur_lane_id: int,
+        adjacent_lane_id: int,
+        ego_point: Point,
+    ) -> bool:
+        # 检查两条lane id是否在lane_map中
+        if not self.is_laneid_in_lanemap(
+            lane_map, cur_lane_id, adjacent_lane_id
+        ):
             return False
+
         # 滤除对向车道
-        if self.is_opposite_lane(lane_map, cur_lane_id, adjacent_lane_id):
+        if self.is_opposite_lanes(lane_map, cur_lane_id, adjacent_lane_id):
             return False
 
         cur_lane = lane_map[cur_lane_id]["polyline"]
         adjacent_lane = lane_map[adjacent_lane_id]["polyline"]
 
-        # 在cur lane上找最近点的索引
-        cur_idx = self.get_nearest_waypoint_idx(cur_lane, ego_point)
+        # 自车在cur lane上找最近点的索引
+        cur_idx = self.find_nearest_waypoint_idx(cur_lane, ego_point)
         if (
             cur_idx == -1
             or cur_idx < len(cur_lane) - self.exit_fork_consider_len
@@ -155,10 +172,16 @@ class RampJudge:
         stitched_adjacent_lane = self.stitch_lane_backward(
             adjacent_lane, adjacent_lane_id, lane_map
         )
+
         # 判断两条lane是否分叉大于一定距离
         return self.large_diff_lane(stitched_cur_lane, stitched_adjacent_lane)
 
-    def pre_check(self, lane_map, current_lanes, current_lane_seqs):
+    def lane_seq_validity_check(
+        self,
+        lane_map: Dict,
+        current_lanes: List[int],
+        current_lane_seqs: List[List[int]],
+    ) -> bool:
         if len(current_lanes) < 1 or len(current_lane_seqs) < 1:
             return False
 
@@ -168,31 +191,46 @@ class RampJudge:
                     lane_map[lane_id]["lane_category"] != "REALITY"
                 ):
                     return False
+
         return True
 
-    def is_in_lanemap(self, lane_map, cur_lane_id, nearby_lane_id):
+    def is_laneid_in_lanemap(
+        self, lane_map: Dict, cur_lane_id: int, nearby_lane_id: int
+    ) -> bool:
         return cur_lane_id in lane_map and nearby_lane_id in lane_map
 
-    def is_opposite_lane(self, lane_map, cur_lane_id, adjacent_lane_id):
-        v1 = lane_map[cur_lane_id]["unit_directions"][0]
-        v2 = lane_map[adjacent_lane_id]["unit_directions"][0]
-        if v1[0] * v2[0] + v1[1] * v2[1] < 0:
-            return True
-        return False
+    def is_opposite_lanes(
+        self, lane_map: Dict, cur_lane_id: int, adjacent_lane_id: int
+    ) -> bool:
+        cur_lane_dir = lane_map[cur_lane_id]["unit_directions"][0]
+        nearby_lane_dir = lane_map[adjacent_lane_id]["unit_directions"][0]
 
-    def is_virtual_lane(self, lane_map, cur_lane_id, nearby_lane_id):
+        return (
+            cur_lane_dir[0] * nearby_lane_dir[0]
+            + cur_lane_dir[1] * nearby_lane_dir[1]
+            < 0
+        )
+
+    def is_virtual_lanes(
+        self, lane_map: Dict, cur_lane_id: int, nearby_lane_id: int
+    ) -> bool:
         return (
             lane_map[cur_lane_id]["lane_category"] != "REALITY"
             or lane_map[nearby_lane_id]["lane_category"] != "REALITY"
         )
 
-    def cut_off_lane_forward(self, cur_lane, nearby_lane, ego_point):
+    def cut_off_lane_forward(
+        self,
+        cur_lane: List[List[float]],
+        nearby_lane: List[List[float]],
+        ego_point: Point,
+    ) -> Tuple[List[List[float]], List[List[float]]]:
         cur_idx = 0
         nearby_idx = 0
 
         if ego_point is not None:
-            cur_idx = self.get_nearest_waypoint_idx(cur_lane, ego_point)
-            nearby_idx = self.get_nearest_waypoint_idx(nearby_lane, ego_point)
+            cur_idx = self.find_nearest_waypoint_idx(cur_lane, ego_point)
+            nearby_idx = self.find_nearest_waypoint_idx(nearby_lane, ego_point)
             if cur_idx == -1 or nearby_idx == -1:
                 return [], []
 
@@ -209,8 +247,11 @@ class RampJudge:
 
         return cutoff_cur_lane, cutoff_nearby_polyline
 
-    def stitch_lane_backward(self, lane_polyline, lane_id, lane_map):
+    def stitch_lane_backward(
+        self, lane_polyline: List[List[float]], lane_id: int, lane_map: Dict
+    ) -> List[List[float]]:
         stitched_lane_polyline = []
+
         if len(lane_polyline) > self.exit_fork_consider_len:
             stitched_lane_polyline = lane_polyline[
                 -self.exit_fork_consider_len :
@@ -223,9 +264,12 @@ class RampJudge:
                     lane_map[cur_pred_id]["polyline"][-concate_len:]
                     + lane_polyline
                 )
+
         return stitched_lane_polyline
 
-    def large_diff_lane(self, cur_lane, adjacent_lane):
+    def large_diff_lane(
+        self, cur_lane: List[List[float]], adjacent_lane: List[List[float]]
+    ) -> bool:
         min_length = min(len(cur_lane), len(adjacent_lane))
         if min_length < 3:
             return False
@@ -242,42 +286,53 @@ class RampJudge:
                 < self.large_dist_th
             ):
                 continue
+
             large_dist_num += 1
             if large_dist_num > self.large_dist_num_th:
                 return True
 
-    def get_nearest_waypoint_idx(self, lane_polyline, ego_point):
-        lane_array = np.array(lane_polyline)
-        distances = np.sqrt(
-            np.sum((lane_array - [ego_point.x, ego_point.y]) ** 2, axis=1)
+        return False
+
+    def find_nearest_waypoint_idx(
+        self, lane_polyline: List[List[float]], point: Point
+    ) -> int:
+        lane_polyline_array = np.array(lane_polyline)
+        point_to_lane_distances = np.sqrt(
+            np.sum((lane_polyline_array - [point.x, point.y]) ** 2, axis=1)
         )
-        nearest_idx = np.argmin(distances)
-        if distances[nearest_idx] > 5:
+        nearest_idx = np.argmin(point_to_lane_distances)
+
+        if point_to_lane_distances[nearest_idx] > 5:
             nearest_idx = -1
 
         return nearest_idx
 
     def is_separate_by_curb(
-        self, cutoff_cur_polyline, cutoff_nearby_polyline, curb_decision
-    ):
+        self,
+        current_polyline: List[List[float]],
+        nearby_polyline: List[List[float]],
+        curb_decision: Dict,
+    ) -> bool:
         curb_src = curb_decision["src_point"]
-        ego_s = curb_decision["ego_s"]
-        curb_s = curb_decision["obs_s"]
-        curb_l = curb_decision["obs_l"]
-        fork_curb_s = []
+        ego_lon_positions = curb_decision["ego_s"]
+        curb_lon_positions = curb_decision["obs_s"]
+        curb_lat_positions = curb_decision["obs_l"]
+        valid_curb_lon_positions = []
 
-        polygon = Polygon(cutoff_cur_polyline + cutoff_nearby_polyline)
-        for idx, s in enumerate(curb_s):
+        enclosed_polygon = Polygon(current_polyline + nearby_polyline)
+        for idx, curb_lon_position in enumerate(curb_lon_positions):
             if (
-                s - ego_s[idx] < self.curb_roi_s_min
-                or s - ego_s[idx] > self.curb_roi_s_max
-                or abs(curb_l[idx]) > self.curb_roi_l_max
+                curb_lon_position - ego_lon_positions[idx] < self.curb_roi_s_min
+                or curb_lon_position - ego_lon_positions[idx]
+                > self.curb_roi_s_max
+                or abs(curb_lat_positions[idx]) > self.curb_roi_l_max
             ):
                 continue
-            if polygon.contains(Point(curb_src[idx])):
-                fork_curb_s.append(s)
 
-        if len(fork_curb_s) < 1:
+            if enclosed_polygon.contains(Point(curb_src[idx])):
+                valid_curb_lon_positions.append(curb_lon_position)
+
+        if len(valid_curb_lon_positions) < 1:
             return False
 
-        return min(fork_curb_s) > ego_s[0]
+        return min(valid_curb_lon_positions) > ego_lon_positions[0]

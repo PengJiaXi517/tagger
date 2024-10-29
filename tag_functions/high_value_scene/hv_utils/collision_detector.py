@@ -3,47 +3,44 @@ from shapely.geometry import LineString, Point, Polygon
 
 
 class CollisionDetector:
-    def __init__(self, params):
-        self.params = params
-        self.big_car_area = 18
+    def __init__(self, params: Dict) -> None:
+        self.params: Dict = params
+        self.big_car_area: int = 18
 
-    def check_collision_curb(
-        self, veh_polygon, curbs_linestring, curb_lat_decision
-    ):
+    def check_distance_to_curb(
+        self,
+        veh_polygon: Polygon,
+        curbs_linestring: Dict,
+        curb_lat_decision: Dict,
+    ) -> Dict:
         collision_info = {
             "has_static_obs_left_strict": False,
             "has_static_obs_right_strict": False,
-            "has_static_obs_left_relax": False,
-            "has_static_obs_right_relax": False,
+            "has_static_obs_left_loose": False,
+            "has_static_obs_right_loose": False,
         }
+
         for idx, curb_string in curbs_linestring.items():
             lat_decision = curb_lat_decision[idx]
             if lat_decision == 0:
                 continue
+
             dist = curb_string.distance(veh_polygon)
-            if dist < self.params.near_static_obs_dist_strict:
-                if lat_decision == 1:
-                    collision_info["has_static_obs_right_strict"] = True
-                elif lat_decision == 2:
-                    collision_info["has_static_obs_left_strict"] = True
-            if dist < self.params.near_static_obs_dist_relax:
-                if lat_decision == 1:
-                    collision_info["has_static_obs_right_relax"] = True
-                elif lat_decision == 2:
-                    collision_info["has_static_obs_left_relax"] = True
-            if (
-                collision_info["has_static_obs_left_strict"]
-                and collision_info["has_static_obs_right_strict"]
+            if self.fill_static_collision_info(
+                dist, lat_decision, collision_info
             ):
                 break
+
         return collision_info
 
-    def check_collision_static_obs(self, veh_polygon, obstacles, id_polygon):
+    def check_distance_to_static_obs(
+        self, veh_polygon: Polygon, obstacles: Dict, id_polygon: Dict
+    ) -> Dict:
         collision_info = {
             "has_static_obs_left_strict": False,
             "has_static_obs_right_strict": False,
-            "has_static_obs_left_relax": False,
-            "has_static_obs_right_relax": False,
+            "has_static_obs_left_loose": False,
+            "has_static_obs_right_loose": False,
         }
 
         for k, v in obstacles.items():
@@ -54,27 +51,19 @@ class CollisionDetector:
                 continue
             if k not in id_polygon:
                 continue
+
             obs_polygon = id_polygon[k]
             dist = veh_polygon.distance(obs_polygon)
-            if dist < self.params.near_static_obs_dist_strict:
-                if lat_decision == 1:
-                    collision_info["has_static_obs_right_strict"] = True
-                elif lat_decision == 2:
-                    collision_info["has_static_obs_left_strict"] = True
-            if dist < self.params.near_static_obs_dist_relax:
-                if lat_decision == 1:
-                    collision_info["has_static_obs_right_relax"] = True
-                elif lat_decision == 2:
-                    collision_info["has_static_obs_left_relax"] = True
-            if (
-                collision_info["has_static_obs_left_strict"]
-                and collision_info["has_static_obs_right_strict"]
+            if self.fill_static_collision_info(
+                dist, lat_decision, collision_info
             ):
                 break
 
         return collision_info
 
-    def check_collision_moving_obs(self, veh_polygon, obstacles, id_polygon):
+    def check_distance_to_moving_obs(
+        self, veh_polygon: Polygon, obstacles: Dict, id_polygon: Dict
+    ) -> Dict:
         collision_info = {
             "has_moving_obs_left": False,
             "has_moving_obs_right": False,
@@ -116,3 +105,24 @@ class CollisionDetector:
                 break
 
         return collision_info
+
+    def fill_static_collision_info(
+        self, dist: float, lat_decision: int, collision_info: Dict
+    ) -> bool:
+        if dist < self.params.near_static_obs_dist_strict:
+            if lat_decision == 1:
+                collision_info["has_static_obs_right_strict"] = True
+            elif lat_decision == 2:
+                collision_info["has_static_obs_left_strict"] = True
+        if dist < self.params.near_static_obs_dist_loose:
+            if lat_decision == 1:
+                collision_info["has_static_obs_right_loose"] = True
+            elif lat_decision == 2:
+                collision_info["has_static_obs_left_loose"] = True
+        if (
+            collision_info["has_static_obs_left_strict"]
+            and collision_info["has_static_obs_right_strict"]
+        ):
+            return True
+
+        return False
