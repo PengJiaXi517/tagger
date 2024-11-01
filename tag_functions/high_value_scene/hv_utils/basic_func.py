@@ -4,6 +4,7 @@ import math
 from shapely.geometry import LineString, Point, Polygon
 from base import TagData
 from collections import defaultdict
+from tag_functions.high_value_scene.common.tag_type import LaneChangeDirection
 
 
 def is_obstacle_always_static(obstacle: Dict) -> bool:
@@ -197,7 +198,7 @@ def judge_lane_change_direction(
     future_path_points_sl_coordinate_projected_to_condition: List[
         Tuple[float, float, Point]
     ]
-) -> int:
+) -> LaneChangeDirection:
     if len(future_path_points_sl_coordinate_projected_to_condition) == 0:
         return -1
 
@@ -206,7 +207,11 @@ def judge_lane_change_direction(
     if proj_l is None:
         return -1
 
-    lane_change_direction = 1 if proj_l > 0 else 0
+    lane_change_direction = (
+        LaneChangeDirection.LANE_CHANGE_TO_RIGHT
+        if proj_l > 0
+        else LaneChangeDirection.LANE_CHANGE_TO_LEFT
+    )
 
     return lane_change_direction
 

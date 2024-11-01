@@ -173,7 +173,11 @@ class BasicInfoGenerartor:
             for point in future_path:
                 path_point = Point(point)
                 project_success = False
-                for linestring in self.basic_info.nearest_condition_linestring:
+                proj_s_list, proj_l_list, linestring_idx_list = [], [], []
+
+                for idx, linestring in enumerate(
+                    self.basic_info.nearest_condition_linestring
+                ):
                     (
                         proj_s,
                         proj_l,
@@ -181,12 +185,22 @@ class BasicInfoGenerartor:
                         linestring, path_point
                     )
                     if proj_s is not None and proj_l is not None:
-                        corr_point = linestring.interpolate(proj_s)
-                        self.basic_info.future_path_points_sl_coordinate_projected_to_condition.append(
-                            (proj_s, proj_l, corr_point)
-                        )
-                        project_success = True
-                        break
+                        proj_s_list.append(proj_s)
+                        proj_l_list.append(proj_l)
+                        linestring_idx_list.append(idx)
+
+                if len(proj_l_list) > 0:
+                    min_proj_l_index = np.argmin(np.abs(np.array(proj_l_list)))
+                    min_proj_s = proj_s_list[min_proj_l_index]
+                    min_proj_l = proj_l_list[min_proj_l_index]
+                    corr_point = self.basic_info.nearest_condition_linestring[
+                        linestring_idx_list[min_proj_l_index]
+                    ].interpolate(min_proj_s)
+                    self.basic_info.future_path_points_sl_coordinate_projected_to_condition.append(
+                        (min_proj_s, min_proj_l, corr_point)
+                    )
+                    project_success = True
+
                 if not project_success:
                     self.basic_info.future_path_points_sl_coordinate_projected_to_condition.append(
                         (None, None, None)

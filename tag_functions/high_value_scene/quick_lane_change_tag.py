@@ -5,6 +5,7 @@ from tag_functions.high_value_scene.common.tag_type import (
     QuickLaneChangeTag,
     FuturePathTag,
     FuturePATHType,
+    LaneChangeDirection,
 )
 from tag_functions.high_value_scene.common.basic_info import BasicInfo
 
@@ -28,15 +29,20 @@ class QuickLaneChangeTagHelper:
         future_interaction_with_moving_obs: List[List[bool]],
         corr_frame_idx: List[Union[None, int]],
         lane_change_begin_index: int,
-        lane_change_direction: int,
+        lane_change_direction: LaneChangeDirection,
     ) -> Tuple[int, int]:
+        dir = (
+            0
+            if lane_change_direction == LaneChangeDirection.LANE_CHANGE_TO_LEFT
+            else 1
+        )
+
         # 变道方向一侧的障碍物距离信息
         static_obstacle_collision_info = [
-            obj[lane_change_direction] for obj in future_narrow_road_states
+            obj[dir] for obj in future_narrow_road_states
         ]
         moving_obstacle_collision_info = [
-            obj[lane_change_direction]
-            for obj in future_interaction_with_moving_obs
+            obj[dir] for obj in future_interaction_with_moving_obs
         ]
 
         min_obstacle_index = -1  # 离障碍物距离过近的点的最小index(future path上的index)
@@ -125,7 +131,7 @@ def label_quick_lane_change_tag(
 
     # 获取变道方向 0: left; 1: right
     lane_change_direction = basic_info.lane_change_direction
-    if lane_change_direction == -1:
+    if lane_change_direction == LaneChangeDirection.UNKNOWN:
         return quick_lane_chanege_tag
 
     # 计算开始变道的位置在future path中的index

@@ -315,6 +315,15 @@ class FuturePathTagHelper:
         )
 
     def label_basic_tag(self, data: TagData, params: Dict) -> BasicPathTag:
+        def normal_angle(theta):
+            while theta >= np.pi:
+                theta -= 2 * np.pi
+            while theta <= -np.pi:
+                theta += 2 * np.pi
+            return theta
+
+        applyall = np.vectorize(normal_angle)
+
         def cal_curvature(
             future_path: List[Tuple[float, float]]
         ) -> Tuple[float, ...]:
@@ -340,15 +349,6 @@ class FuturePathTagHelper:
                 curvature[curvature < 0.0].sum(),
                 curvature.sum(),
             )
-
-        def normal_angle(theta):
-            while theta >= np.pi:
-                theta -= 2 * np.pi
-            while theta <= -np.pi:
-                theta += 2 * np.pi
-            return theta
-
-        applyall = np.vectorize(normal_angle)
 
         (
             abs_curvature,

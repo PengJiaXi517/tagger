@@ -1,6 +1,7 @@
 from shapely.geometry import LineString, Polygon, Point
 from typing import Dict, List, Tuple
 import numpy as np
+from tag_functions.high_value_scene.common.tag_type import LaneChangeDirection
 
 
 class BasicInfo:
@@ -30,4 +31,6 @@ class BasicInfo:
             Tuple[float, float, Point]
         ] = []
 
-        self.lane_change_direction: int = -1
+        self.lane_change_direction: LaneChangeDirection = (
+            LaneChangeDirection.UNKNOWN
+        )

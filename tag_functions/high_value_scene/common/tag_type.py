@@ -126,6 +126,12 @@ class LcPATHTag:
         }
 
 
+class LaneChangeDirection(Enum):
+    UNKNOWN = -1
+    LANE_CHANGE_TO_LEFT = 0
+    LANE_CHANGE_TO_RIGHT = 1
+
+
 class JunctionTurnType(Enum):
     UNKNWON = 0
     FORWARD = 1
@@ -301,7 +307,7 @@ class HighValueTag:
     yield_vru_tag: YieldVRUTag = None
     interact_with_moving_obs_tag: InteractWithMovingObsTag = None
     ramp_tag: RampTag = None
-    future_path_tag: FuturePathTag = None
+    future_path_tag: FuturePathTag = field(default_factory=FuturePathTag)
     lane_central_adsorb_tag: LaneCentralAdsorbTag = None
     quick_lane_change_tag: QuickLaneChangeTag = None
     right_turn_only_tag: RightTurnOnlyTag = None
@@ -335,9 +341,6 @@ class HighValueTag:
             else None,
             "max_abs_path_curvature": self.max_abs_path_curvature,
         }
-
-        if self.future_path_tag is None:
-            self.future_path_tag = FuturePathTag()
 
         ret_dict.update(self.future_path_tag.as_dict())
 
