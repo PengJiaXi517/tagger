@@ -62,7 +62,7 @@ class RampTagHelper:
         future_path = ego_path_info.future_path
 
         # 滤掉过路口场景
-        if any(obj is not None for obj in ego_path_info.in_junction_id):
+        if any(juntion_id is not None for juntion_id in ego_path_info.in_junction_id):
             return False
 
         # 拿到变道后到达的lane id以及对应的点在future path上的index

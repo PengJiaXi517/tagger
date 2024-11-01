@@ -58,7 +58,7 @@ class BasicInfoGenerartor:
 
         # 是否通过路口
         self.basic_info.is_cross_junction = any(
-            obj is not None for obj in ego_path_info.in_junction_id
+            juntion_id is not None for juntion_id in ego_path_info.in_junction_id
         )
 
         # 计算future path中每一个点的曲率和转向
