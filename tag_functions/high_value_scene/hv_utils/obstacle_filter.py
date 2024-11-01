@@ -8,13 +8,18 @@ from tag_functions.high_value_scene.hv_utils.basic_func import (
 
 
 class ObstacleFilter:
-    def __init__(self) -> None:
-        self.filter_obs_max_l: float = 5.0
-        self.front_vehicle_rel_x: float = 10.0
-        self.front_vehicle_rel_y: float = 0.5
+    def __init__(
+        self,
+        filter_obs_max_l: float,
+        front_vehicle_rel_x: float,
+        front_vehicle_rel_y: float,
+    ) -> None:
+        self.filter_obs_max_l: float = filter_obs_max_l
+        self.front_vehicle_rel_x: float = front_vehicle_rel_x
+        self.front_vehicle_rel_y: float = front_vehicle_rel_y
 
     def find_moving_obstacles(self, obstacles: Dict) -> Dict:
-        moving_obs = {}
+        moving_obstacles_map = {}
         for id, obs in obstacles.items():
             if id == -9:
                 continue
@@ -23,13 +28,13 @@ class ObstacleFilter:
                 continue
 
             if not is_obstacle_always_static(obs):
-                moving_obs[id] = obs
+                moving_obstacles_map[id] = obs
 
-        return moving_obs
+        return moving_obstacles_map
 
     def build_static_obstacle_polygons(self, obstacles: Dict) -> Dict:
-        id_polygon = {}
-        static_obs = {}
+        static_obstacles_polygons_map = {}
+        static_obstacles_map = {}
         for id, obs in obstacles.items():
             if id == -9:
                 continue
@@ -55,12 +60,15 @@ class ObstacleFilter:
                         obs_bbox[0],
                     ]
                 )
-                id_polygon[id] = obs_polygon
-                static_obs[id] = obs
+                static_obstacles_polygons_map[id] = obs_polygon
+                static_obstacles_map[id] = obs
 
-        return static_obs, id_polygon
+        return static_obstacles_map, static_obstacles_polygons_map
 
     def build_curbs_linestring(self, curb_decision: Dict) -> Dict:
+        curbs_linestring = {}
+        if curb_decision is None:
+            return curbs_linestring
         curb_vec = curb_decision["vec"]
         curb_src = curb_decision["src_point"]
         curb_end = [
@@ -70,7 +78,6 @@ class ObstacleFilter:
         curbs = [(curb_src[i], curb_end[i]) for i in range(len(curb_src))]
         curbs_l = curb_decision["obs_l"]
 
-        curbs_linestring = {}
         for idx, curb in enumerate(curbs):
             if abs(curbs_l[idx]) > self.filter_obs_max_l:
                 continue

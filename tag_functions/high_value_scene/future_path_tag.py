@@ -1,6 +1,6 @@
 from typing import Dict, List
 from base import TagData
-from tag_functions.high_value_scene.hv_utils.tag_type import (
+from tag_functions.high_value_scene.common.tag_type import (
     FuturePathTag,
     FuturePATHType,
 )

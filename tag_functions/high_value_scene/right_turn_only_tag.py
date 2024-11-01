@@ -1,24 +1,32 @@
 from typing import Dict, List, Tuple
-import numpy as np
 from shapely.geometry import LineString, Point, Polygon
 from base import TagData
-from tag_functions.high_value_scene.hv_utils.basic_func import (
-    build_linestring_from_lane_seq_ids,
-    distance_point_to_linestring_list,
-    xy_to_sl,
-)
-from tag_functions.high_value_scene.hv_utils.tag_type import (
+from tag_functions.high_value_scene.common.basic_info import BasicInfo
+from tag_functions.high_value_scene.common.tag_type import (
     FuturePathTag,
     FuturePATHType,
     RightTurnOnlyTag,
 )
+from tag_functions.high_value_scene.hv_utils.basic_func import (
+    build_linestring_from_lane_seq_ids,
+    distance_point_to_linestring_list,
+)
 
 
 class RightTurnOnlyTagHelper:
-    def __init__(self) -> None:
-        self.ego_to_junction_dist_threshold: float = 50.0
-        self.future_path_to_junction_dist_threshold: float = 8.0
-        self.sum_path_curvature_threshold: float = -0.2
+    def __init__(
+        self,
+        ego_to_junction_dist_threshold: float,
+        future_path_to_junction_dist_threshold: float,
+        sum_path_curvature_threshold: float,
+    ) -> None:
+        self.ego_to_junction_dist_threshold: float = (
+            ego_to_junction_dist_threshold
+        )
+        self.future_path_to_junction_dist_threshold: float = (
+            future_path_to_junction_dist_threshold
+        )
+        self.sum_path_curvature_threshold: float = sum_path_curvature_threshold
 
     def is_ego_vehicle_near_junction(
         self,
@@ -78,22 +86,28 @@ class RightTurnOnlyTagHelper:
     def get_target_lane_seq_linestring(
         self,
         lane_map: Dict,
-        future_path: List[Tuple[float, float]],
         current_lane_seqs: List[List[int]],
-        future_path_tag: FuturePathTag,
+        basic_info: BasicInfo,
     ) -> List[LineString]:
-        target_linestring = (
-            future_path_tag.condition_res_tag.nearest_condition_linestring
-        )
-        condition_lane_is_in_left = False
+        target_linestring = basic_info.nearest_condition_linestring
 
-        for linestring in (
-            target_linestring if target_linestring is not None else []
+        if (
+            len(
+                basic_info.future_path_points_sl_coordinate_projected_to_condition
+            )
+            == 0
         ):
-            _, proj_l = xy_to_sl(linestring, Point(future_path[0]))
-            if proj_l < -1.75:
-                condition_lane_is_in_left = True
-                break
+            return target_linestring
+
+        (
+            _,
+            proj_l,
+            _,
+        ) = basic_info.future_path_points_sl_coordinate_projected_to_condition[
+            0
+        ]
+
+        condition_lane_is_in_left = True if proj_l < -1.75 else False
 
         # 如果目标车道在左边，则认为是出右转专用道后的变道行为，用current_lane_seqs
         if condition_lane_is_in_left:
@@ -109,7 +123,10 @@ class RightTurnOnlyTagHelper:
         return target_linestring
 
     def is_right_turn_only_scene(
-        self, data: TagData, future_path_tag: FuturePathTag
+        self,
+        data: TagData,
+        future_path_tag: FuturePathTag,
+        basic_info: BasicInfo,
     ) -> bool:
         if future_path_tag.path_type not in [
             FuturePATHType.CRUISE,
@@ -124,14 +141,13 @@ class RightTurnOnlyTagHelper:
         ):
             return False
 
-        in_junction_id = data.label_scene.ego_path_info.in_junction_id
         future_path_linestring = (
             data.label_scene.ego_path_info.future_path_linestring
         )
         junction_map = data.label_scene.percepmap.junction_map
         current_lanes = data.label_scene.ego_obs_lane_seq_info.current_lanes
 
-        if any(obj is not None for obj in in_junction_id):
+        if basic_info.is_cross_junction:
             return False
 
         if not self.is_ego_vehicle_near_junction(
@@ -143,24 +159,28 @@ class RightTurnOnlyTagHelper:
 
 
 def label_right_turn_only_tag(
-    data: TagData, params: Dict, future_path_tag: FuturePathTag
+    data: TagData, basic_info: BasicInfo, future_path_tag: FuturePathTag
 ) -> RightTurnOnlyTag:
     right_turn_only_tag = RightTurnOnlyTag()
-    right_turn_only_tag_helper = RightTurnOnlyTagHelper()
+    right_turn_only_tag_helper = RightTurnOnlyTagHelper(
+        ego_to_junction_dist_threshold=50.0,
+        future_path_to_junction_dist_threshold=8.0,
+        sum_path_curvature_threshold=-0.2,
+    )
     lane_map = data.label_scene.percepmap.lane_map
     future_path = data.label_scene.ego_path_info.future_path
     current_lane_seqs = data.label_scene.ego_obs_lane_seq_info.current_lane_seqs
 
     # 首先，判断是否为右转专用道场景
     if right_turn_only_tag_helper.is_right_turn_only_scene(
-        data, future_path_tag
+        data, future_path_tag, basic_info
     ):
         right_turn_only_tag.is_right_turn_only = True
 
         # 获取目标lane seq的linestring, 用于计算与future path point的距离，从而得到变道前的valid len
         target_lane_seq_linestring = (
             right_turn_only_tag_helper.get_target_lane_seq_linestring(
-                lane_map, future_path, current_lane_seqs, future_path_tag
+                lane_map, current_lane_seqs, basic_info
             )
         )
 

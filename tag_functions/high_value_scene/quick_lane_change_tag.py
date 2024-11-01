@@ -1,40 +1,35 @@
 from typing import Dict, List, Tuple, Union
 from shapely.geometry import LineString, Point
 from base import TagData
-from tag_functions.high_value_scene.hv_utils.tag_type import (
-    NarrowRoadTag,
-    InteractWithMovingObsTag,
+from tag_functions.high_value_scene.common.tag_type import (
     QuickLaneChangeTag,
     FuturePathTag,
     FuturePATHType,
 )
-from tag_functions.high_value_scene.hv_utils.basic_func import (
-    get_lane_change_direction,
-    distance_point_to_linestring_list,
-)
+from tag_functions.high_value_scene.common.basic_info import BasicInfo
 
 
 class QuickLaneChangeTagHelper:
-    def __init__(self) -> None:
-        self.consider_index_num: int = 6
-        self.delta_dist_threshold_low: float = -0.015
-        self.delta_dist_threshold_medium: float = -0.03
-        self.delta_dist_threshold_high: float = -0.08
+    def __init__(
+        self,
+        consider_future_index_num: int,
+        delta_dist_threshold_low: float,
+        delta_dist_threshold_medium: float,
+        delta_dist_threshold_high: float,
+    ) -> None:
+        self.consider_future_index_num: int = consider_future_index_num
+        self.delta_dist_threshold_low: float = delta_dist_threshold_low
+        self.delta_dist_threshold_medium: float = delta_dist_threshold_medium
+        self.delta_dist_threshold_high: float = delta_dist_threshold_high
 
     def check_obstacles_before_lane_change(
         self,
-        interact_with_moving_obs_tag: InteractWithMovingObsTag,
-        narrow_road_tag: NarrowRoadTag,
+        future_narrow_road_states: List[List[bool]],
+        future_interaction_with_moving_obs: List[List[bool]],
         corr_frame_idx: List[Union[None, int]],
         lane_change_begin_index: int,
         lane_change_direction: int,
     ) -> Tuple[int, int]:
-        # 障碍物距离信息
-        future_narrow_road_states = narrow_road_tag.future_narrow_road_states
-        future_interaction_with_moving_obs = (
-            interact_with_moving_obs_tag.future_interaction_with_moving_obs
-        )
-
         # 变道方向一侧的障碍物距离信息
         static_obstacle_collision_info = [
             obj[lane_change_direction] for obj in future_narrow_road_states
@@ -60,15 +55,25 @@ class QuickLaneChangeTagHelper:
 
     def judge_lane_change_begin_index(
         self,
-        future_path: List[Tuple[float, float]],
-        condition_linestring: List[LineString],
+        future_path_points_sl_coordinate_projected_to_condition: List[
+            Tuple[float, float, Point]
+        ],
     ) -> int:
-        distance_to_condition_linestring = [
-            distance_point_to_linestring_list(
-                Point(point), condition_linestring
-            )
-            for point in future_path
-        ]
+        if (
+            len(future_path_points_sl_coordinate_projected_to_condition)
+            < self.consider_future_index_num
+        ):
+            return -1
+
+        distance_to_condition_linestring = []
+        for (
+            _,
+            proj_l,
+            _,
+        ) in future_path_points_sl_coordinate_projected_to_condition:
+            if proj_l is None:
+                break
+            distance_to_condition_linestring.append(abs(proj_l))
 
         distance_diffs = [
             distance_to_condition_linestring[i]
@@ -77,12 +82,12 @@ class QuickLaneChangeTagHelper:
         ]
 
         lane_change_begin_index = -1
-        for i in range(len(distance_diffs) - self.consider_index_num):
+        for i in range(len(distance_diffs) - self.consider_future_index_num):
             if distance_diffs[i] > self.delta_dist_threshold_low:
                 continue
 
             future_distance_diffs = distance_diffs[
-                i : i + self.consider_index_num
+                i : i + self.consider_future_index_num
             ]
 
             if distance_diffs[i] < self.delta_dist_threshold_high or (
@@ -91,7 +96,7 @@ class QuickLaneChangeTagHelper:
                     for d in future_distance_diffs
                     if d <= self.delta_dist_threshold_medium
                 )
-                > 0.8 * self.consider_index_num
+                > 0.8 * self.consider_future_index_num
             ):
                 lane_change_begin_index = i
                 break
@@ -100,15 +105,15 @@ class QuickLaneChangeTagHelper:
 
 
 def label_quick_lane_change_tag(
-    data: TagData,
-    params: Dict,
-    interact_with_moving_obs_tag: InteractWithMovingObsTag,
-    narrow_road_tag: NarrowRoadTag,
-    future_path_tag: FuturePathTag,
+    data: TagData, basic_info: BasicInfo, future_path_tag: FuturePathTag
 ) -> QuickLaneChangeTag:
     quick_lane_chanege_tag = QuickLaneChangeTag()
-    quick_lane_chanege_tag_helper = QuickLaneChangeTagHelper()
-    future_path = data.label_scene.ego_path_info.future_path
+    quick_lane_chanege_tag_helper = QuickLaneChangeTagHelper(
+        consider_future_index_num=6,
+        delta_dist_threshold_low=-0.015,
+        delta_dist_threshold_medium=-0.03,
+        delta_dist_threshold_high=-0.08,
+    )
 
     # 判断是否为变道场景
     if future_path_tag.path_type not in [
@@ -119,22 +124,14 @@ def label_quick_lane_change_tag(
     quick_lane_chanege_tag.is_lane_change = True
 
     # 获取变道方向 0: left; 1: right
-    lane_change_direction = get_lane_change_direction(
-        future_path_tag.lc_path_tag
-    )
-
-    # 获取离future path横向距离最近的condtion_lane_seq linestring
-    condition_linestring = (
-        future_path_tag.condition_res_tag.nearest_condition_linestring
-    )
-
-    if lane_change_direction == -1 or condition_linestring is None:
+    lane_change_direction = basic_info.lane_change_direction
+    if lane_change_direction == -1:
         return quick_lane_chanege_tag
 
     # 计算开始变道的位置在future path中的index
     lane_change_begin_index = (
         quick_lane_chanege_tag_helper.judge_lane_change_begin_index(
-            future_path, condition_linestring
+            basic_info.future_path_points_sl_coordinate_projected_to_condition
         )
     )
     if lane_change_begin_index == -1:
@@ -147,8 +144,8 @@ def label_quick_lane_change_tag(
         min_obstacle_index,
         max_obstacle_index,
     ) = quick_lane_chanege_tag_helper.check_obstacles_before_lane_change(
-        interact_with_moving_obs_tag,
-        narrow_road_tag,
+        basic_info.future_narrow_road_states,
+        basic_info.future_interaction_with_moving_obs,
         data.label_scene.ego_path_info.corr_frame_idx,
         lane_change_begin_index,
         lane_change_direction,

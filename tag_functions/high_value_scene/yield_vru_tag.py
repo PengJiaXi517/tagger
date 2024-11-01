@@ -2,7 +2,7 @@ from typing import Dict, List, Tuple
 import numpy as np
 from shapely.geometry import LineString, Point, Polygon
 from base import TagData
-from tag_functions.high_value_scene.hv_utils.tag_type import (
+from tag_functions.high_value_scene.common.tag_type import (
     YieldVRUTag,
 )
 from tag_functions.high_value_scene.hv_utils.obstacle_filter import (
@@ -100,7 +100,9 @@ def label_yield_vru_tag(data: TagData, params: Dict) -> YieldVRUTag:
         return yield_vru_tag
 
     # 判断刹停点前方是否有车辆
-    obs_filter = ObstacleFilter()
+    obs_filter = ObstacleFilter(
+        filter_obs_max_l=5.0, front_vehicle_rel_x=10.0, front_vehicle_rel_y=0.5
+    )
     if obs_filter.has_vehicle_in_front(obstacles, stop_point, stop_idx):
         return yield_vru_tag
 
@@ -111,7 +113,7 @@ def label_yield_vru_tag(data: TagData, params: Dict) -> YieldVRUTag:
         future_path_linestring,
         stop_point,
         stop_idx,
-        params.time_window_bef_stop,
+        params["time_window_bef_stop"],
     ):
         yield_vru_tag.is_yield_vru = True
 

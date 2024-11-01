@@ -1,5 +1,4 @@
 from dataclasses import dataclass, field
-from shapely.geometry import LineString
 from typing import Dict, List, Tuple
 from enum import Enum
 
@@ -8,9 +7,6 @@ from enum import Enum
 class BypassJunctionCurbTag:
     def __init__(self) -> None:
         self.is_bypass_junction_curb: bool = False
-        self.future_bypass_junction_curb: List[bool] = [
-            False for i in range(100)
-        ]
 
     def as_dict(self):
         return {
@@ -20,10 +16,8 @@ class BypassJunctionCurbTag:
 
 @dataclass(repr=False)
 class LaneCentralAdsorbTag:
-    def __init__(self, future_path: List[Tuple[float, float]]) -> None:
-        self.adsorbed_path: List[List[float]] = [
-            [coord for coord in pt] for pt in future_path
-        ]
+    def __init__(self) -> None:
+        self.adsorbed_path: List[Tuple[float, float]] = []
 
     def as_dict(self):
         return {
@@ -50,9 +44,6 @@ class QuickLaneChangeTag:
 class InteractWithMovingObsTag:
     def __init__(self) -> None:
         self.is_interact_with_moving_obs: bool = False
-        self.future_interaction_with_moving_obs: List[List[bool]] = [
-            [False, False] for i in range(80)
-        ]
 
     def as_dict(self):
         return {
@@ -64,12 +55,6 @@ class InteractWithMovingObsTag:
 class NarrowRoadTag:
     def __init__(self) -> None:
         self.is_narrow_road: bool = False
-        self.future_narrow_road_states: List[List[bool]] = [
-            [False, False] for i in range(100)
-        ]
-        self.future_narrow_road_states_loose_threshold: List[List[bool]] = [
-            [False, False] for i in range(100)
-        ]
 
     def as_dict(self):
         return {
@@ -128,7 +113,6 @@ class LcPATHTag:
     arrive_nearest_pose_l: float = 0.0
     arrive_percep_pose_l: float = 0.0
     arrive_length: float = 0.0
-    lane_change_direction: int = -1
     labeled_lane_seq: List[int] = field(default_factory=list)
 
     def as_dict(self):
@@ -221,7 +205,6 @@ class JunctionPATHTag:
 class ConditionResTag:
     start_lane_seq_ids: List[List[int]] = field(default_factory=list)
     end_lane_seq_ids: List[List[int]] = field(default_factory=list)
-    nearest_condition_linestring: List[LineString] = field(default_factory=list)
 
     def as_dict(self):
         return {
@@ -322,6 +305,7 @@ class HighValueTag:
     lane_central_adsorb_tag: LaneCentralAdsorbTag = None
     quick_lane_change_tag: QuickLaneChangeTag = None
     right_turn_only_tag: RightTurnOnlyTag = None
+    max_abs_path_curvature: float = 0.0
 
     def as_dict(self):
         ret_dict = {
@@ -349,6 +333,7 @@ class HighValueTag:
             "right_turn_only_tag": self.right_turn_only_tag.as_dict()
             if self.right_turn_only_tag is not None
             else None,
+            "max_abs_path_curvature": self.max_abs_path_curvature,
         }
 
         if self.future_path_tag is None:

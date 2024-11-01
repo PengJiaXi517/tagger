@@ -5,14 +5,25 @@ from base import EgoPathInfo
 
 
 class RampTagHelper:
-    def __init__(self) -> None:
-        self.enter_fork_consider_len: int = 20  # 考虑的index数量
-        self.exit_fork_consider_len: int = 50
-        self.large_dist_th: int = 10
-        self.large_dist_num_th: int = 3
-        self.curb_roi_s_min: int = -10
-        self.curb_roi_s_max: int = 100
-        self.curb_roi_l_max: int = 10
+    def __init__(
+        self,
+        enter_fork_consider_len: int,
+        exit_fork_consider_len: int,
+        large_dist_th: float,
+        large_dist_num_th: int,
+        curb_roi_s_min: float,
+        curb_roi_s_max: float,
+        curb_roi_l_max: float,
+    ) -> None:
+        self.enter_fork_consider_len: int = (
+            enter_fork_consider_len  # 考虑的index数量
+        )
+        self.exit_fork_consider_len: int = exit_fork_consider_len
+        self.large_dist_th: int = large_dist_th
+        self.large_dist_num_th: int = large_dist_num_th
+        self.curb_roi_s_min: int = curb_roi_s_min
+        self.curb_roi_s_max: int = curb_roi_s_max
+        self.curb_roi_l_max: int = curb_roi_l_max
 
     def enter_ramp_cruise(
         self, lane_map: Dict, current_lanes: List[int], curb_decision: Dict

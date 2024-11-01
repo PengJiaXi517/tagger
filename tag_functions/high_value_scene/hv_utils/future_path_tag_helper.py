@@ -2,7 +2,7 @@ from typing import Dict, List, Tuple
 import numpy as np
 from shapely.geometry import LineString, Point
 from base import PercepMap, TagData
-from tag_functions.high_value_scene.hv_utils.tag_type import (
+from tag_functions.high_value_scene.common.tag_type import (
     ConditionResTag,
     CruisePATHTag,
     LcPATHTag,
@@ -10,10 +10,6 @@ from tag_functions.high_value_scene.hv_utils.tag_type import (
     FuturePATHType,
     BasicPathTag,
     JUNCTION_GOAL_2_TURN_TYPE,
-)
-from tag_functions.high_value_scene.hv_utils.basic_func import (
-    build_linestring_from_lane_seq_ids,
-    xy_to_sl,
 )
 
 
@@ -39,14 +35,6 @@ class FuturePathTagHelper:
                 condition_res_tag.end_lane_seq_ids.append(lane_seq_ids[idx_end])
             else:
                 condition_res_tag.end_lane_seq_ids.append([])
-
-        condition_res_tag.nearest_condition_linestring = (
-            self.find_nearest_condition_linestring(
-                data,
-                condition_res_tag.start_lane_seq_ids,
-                condition_res_tag.end_lane_seq_ids,
-            )
-        )
 
         return condition_res_tag
 
@@ -169,12 +157,6 @@ class FuturePathTagHelper:
             for lane_id, pose_l in final_corr_lane_ids:
                 if lane_id in lane_seq:
                     lc_path_tag.arrive_final_pose_l = float(np.abs(pose_l))
-
-            lc_path_tag.lane_change_direction = (
-                self.judge_lane_change_direction(
-                    percep_map.lane_map, start_point, lane_seq
-                )
-            )
 
             lc_path_tags.append(lc_path_tag)
 
@@ -476,57 +458,3 @@ class FuturePathTagHelper:
                 always_on_current_lane_seq,
                 arrive_on_nearby_lane_seq,
             )
-
-    def judge_lane_change_direction(
-        self, lane_map: Dict, ego_point: Point, condition_lane_seq: List[int]
-    ) -> int:
-        condition_lane_seq_linestring = build_linestring_from_lane_seq_ids(
-            lane_map, condition_lane_seq
-        )
-
-        _, proj_l = xy_to_sl(condition_lane_seq_linestring, ego_point)
-        if proj_l is None:
-            return -1
-
-        lane_change_direction = 1 if proj_l > 0 else 0
-
-        return lane_change_direction
-
-    def find_nearest_condition_linestring(
-        self,
-        data: TagData,
-        condition_start_lane_seq_ids: List[List[int]],
-        condition_end_lane_seq_ids: List[List[int]],
-    ) -> List[LineString]:
-        future_path = data.label_scene.ego_path_info.future_path
-        lane_map = data.label_scene.percepmap.lane_map
-
-        min_lateral_dist = 1e6
-        nearest_condition_linestring = None
-
-        for start_ids, end_ids in zip(
-            condition_start_lane_seq_ids, condition_end_lane_seq_ids
-        ):
-            condition_linestring = [
-                linestring
-                for linestring in [
-                    build_linestring_from_lane_seq_ids(lane_map, start_ids),
-                    build_linestring_from_lane_seq_ids(lane_map, end_ids),
-                ]
-                if linestring is not None
-            ]
-
-            sum_proj_l = 0
-            for point in future_path:
-                path_point = Point(point)
-                for linestring in condition_linestring:
-                    proj_s, proj_l = xy_to_sl(linestring, path_point)
-                    if proj_s is not None and proj_l is not None:
-                        sum_proj_l += abs(proj_l)
-                        break
-
-            if 0 < sum_proj_l < min_lateral_dist:
-                min_lateral_dist = sum_proj_l
-                nearest_condition_linestring = condition_linestring
-
-        return nearest_condition_linestring
