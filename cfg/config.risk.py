@@ -9,22 +9,17 @@ tag_pipelines = {
     "ego_state_occ_environment": {},
     "ego_state_map_environment": {},
     "ego_state_obs_environment": {},
-    "future_path_tag": {
+    "interactive_tag": {},
+    "label_high_value_tag": {
+        "big_car_area": 18.0,
+        "near_static_obs_dist_strict": 0.9,
+        "near_static_obs_dist_loose": 1.5,
+        "near_moving_obs_dist": 0.75,
+        "near_caution_obs_dist": 1.0,
+        "large_curvature_threshold": 0.05,
+        "time_window_bef_stop": 2e6,
         "sample_point_length": 1.0,
     },
-    "interactive_tag": {},
-    "near_static_obj_tag": {
-        "near_static_obs_dist_strict": 0.9,
-        "near_static_obs_dist_relax": 1.5,
-        "curvature_th": 0.05,
-    },
-    "mixed_traffic_tag": {
-        "near_moving_obs_dist": 0.75,
-    },
-    "yield_vru_tag": {
-        "time_window_bef_stop": 2e6,
-    },
-    "ramp_tag": {},
 }
 
 max_valid_point_num = 100
