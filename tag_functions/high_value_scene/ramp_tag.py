@@ -9,18 +9,21 @@ from tag_functions.high_value_scene.hv_utils.ramp_tag_helper import (
 from tag_functions.high_value_scene.hv_utils.obstacle_filter import (
     ObstacleFilter,
 )
+from tag_functions.high_value_scene.common.basic_info import (
+    BasicInfo,
+)
 
 
-def label_ramp_tag(data: TagData) -> RampTag:
+def label_ramp_tag(data: TagData, basic_info: BasicInfo) -> RampTag:
     ramp_tag = RampTag()
     ramp_tag_helper = RampTagHelper(
-        enter_fork_consider_len=20,
+        enter_fork_consider_len=30,
         exit_fork_consider_len=50,
         large_dist_th=10.0,
         large_dist_num_th=3,
-        curb_roi_s_min=-10.0,
+        curb_roi_s_min=-5.0,
         curb_roi_s_max=100.0,
-        curb_roi_l_max=10.0,
+        curb_roi_l_max=5.0,
     )
     obs_filter = ObstacleFilter(
         filter_obs_max_l=5.0, front_vehicle_rel_x=10.0, front_vehicle_rel_y=0.5
@@ -36,6 +39,9 @@ def label_ramp_tag(data: TagData) -> RampTag:
     obstacles = data.label_scene.obstacles
     ego_point = obs_filter.get_ego_point(obstacles[-9])
 
+    if basic_info.is_cross_junction:
+        return ramp_tag
+
     if curb_decision is None or not ramp_tag_helper.lane_seq_validity_check(
         lane_map, current_lanes, current_lane_seqs
     ):
@@ -43,10 +49,14 @@ def label_ramp_tag(data: TagData) -> RampTag:
 
     # 判断进匝道, 情况一: cruise场景下lane一分为二，且有curb隔开
     # 情况二: lc场景下，当前车道和目标车道间有curb隔开
+    # if ramp_tag_helper.enter_ramp_cruise(
+    #     lane_map, current_lanes, curb_decision
+    # ) or ramp_tag_helper.enter_ramp_lane_change(
+    #     lane_map, current_lanes, curb_decision, current_lane_seqs, ego_path_info
+    # ):
+    #     ramp_tag.is_enter_ramp = True
     if ramp_tag_helper.enter_ramp_cruise(
-        lane_map, current_lanes, curb_decision
-    ) or ramp_tag_helper.enter_ramp_lane_change(
-        lane_map, current_lanes, curb_decision, current_lane_seqs, ego_path_info
+        lane_map, current_lanes, curb_decision, basic_info
     ):
         ramp_tag.is_enter_ramp = True
 

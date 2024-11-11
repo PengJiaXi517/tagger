@@ -107,7 +107,9 @@ class RightTurnOnlyTagHelper:
             0
         ]
 
-        condition_lane_is_in_left = True if proj_l < -1.75 else False
+        condition_lane_is_in_left = (
+            True if (proj_l is not None and proj_l < -1.75) else False
+        )
 
         # 如果目标车道在左边，则认为是出右转专用道后的变道行为，用current_lane_seqs
         if condition_lane_is_in_left:

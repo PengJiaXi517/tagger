@@ -20,6 +20,7 @@ class FuturePathCollisionChecker:
         self,
         future_narrow_road_states: List[List[bool]],
         future_narrow_road_states_loose_threshold: List[List[bool]],
+        future_narrow_road_curb_index: List[List[int]],
         collision_res: CollisionResult,
         idx: int,
     ) -> None:
@@ -28,6 +29,11 @@ class FuturePathCollisionChecker:
 
         if len(future_narrow_road_states_loose_threshold) <= idx:
             future_narrow_road_states_loose_threshold.append([False, False])
+
+        if len(future_narrow_road_curb_index) <= idx:
+            future_narrow_road_curb_index.append(
+                [collision_res.left_curb_index, collision_res.right_curb_index]
+            )
 
         future_narrow_road_states[idx][0] |= collision_res.has_obs_left_strict
         future_narrow_road_states[idx][1] |= collision_res.has_obs_right_strict
@@ -50,6 +56,8 @@ class FuturePathCollisionChecker:
     ) -> Tuple[List[List[bool]], List[List[bool]]]:
         future_narrow_road_states = []
         future_narrow_road_states_loose_threshold = []
+        future_narrow_road_curb_index = []
+
         collision_detector = CollisionDetector(
             params["big_car_area"],
             params["near_static_obs_dist_strict"],
@@ -68,6 +76,7 @@ class FuturePathCollisionChecker:
             self.update_future_narrow_road_states(
                 future_narrow_road_states,
                 future_narrow_road_states_loose_threshold,
+                future_narrow_road_curb_index,
                 collision_res,
                 idx,
             )
@@ -84,6 +93,7 @@ class FuturePathCollisionChecker:
             self.update_future_narrow_road_states(
                 future_narrow_road_states,
                 future_narrow_road_states_loose_threshold,
+                future_narrow_road_curb_index,
                 collision_res,
                 idx,
             )
@@ -91,6 +101,7 @@ class FuturePathCollisionChecker:
         return (
             future_narrow_road_states,
             future_narrow_road_states_loose_threshold,
+            future_narrow_road_curb_index
         )
 
     def check_distance_to_moving_obs_for_future_states(

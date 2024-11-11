@@ -8,6 +8,8 @@ class CollisionResult:
         self.has_obs_left_loose: bool = False
         self.has_obs_right_strict: bool = False
         self.has_obs_right_loose: bool = False
+        self.left_curb_index: int = None
+        self.right_curb_index: int = None
 
 
 class CollisionDetector:
@@ -40,7 +42,7 @@ class CollisionDetector:
 
             dist = curb_string.distance(veh_polygon)
             if self.fill_static_collision_res(
-                dist, lat_decision, collision_res
+                dist, lat_decision, collision_res, idx
             ):
                 break
 
@@ -124,7 +126,7 @@ class CollisionDetector:
         return collision_res
 
     def fill_static_collision_res(
-        self, dist: float, lat_decision: int, collision_res: CollisionResult
+        self, dist: float, lat_decision: int, collision_res: CollisionResult, curb_idx=None
     ) -> bool:
         if dist < self.near_static_obs_dist_strict:
             if lat_decision == 1:
@@ -135,8 +137,10 @@ class CollisionDetector:
         if dist < self.near_static_obs_dist_loose:
             if lat_decision == 1:
                 collision_res.has_obs_right_loose = True
+                collision_res.right_curb_index = curb_idx
             elif lat_decision == 2:
                 collision_res.has_obs_left_loose = True
+                collision_res.left_curb_index = curb_idx
 
         if (
             collision_res.has_obs_left_strict

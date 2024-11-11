@@ -13,7 +13,7 @@ tag_pipelines = {
     "label_high_value_tag": {
         "big_car_area": 18.0,
         "near_static_obs_dist_strict": 0.9,
-        "near_static_obs_dist_loose": 1.5,
+        "near_static_obs_dist_loose": 3.5,
         "near_moving_obs_dist": 0.75,
         "near_caution_obs_dist": 1.0,
         "large_curvature_threshold": 0.05,
