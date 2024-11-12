@@ -146,7 +146,7 @@ class FuturePathTagHelper:
                 [pl.distance(start_point) for pl in polylines]
             )
 
-            pose_ls = []
+            pose_ls = [np.inf]
             for i in range(first_arrive_lane_seq_idx, num_points_on_lane):
                 point = Point(path_line_string.coords[i])
                 curr_pose_l = np.min([pl.distance(point) for pl in polylines])
