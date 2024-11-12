@@ -52,11 +52,11 @@ class RampTagHelper:
 
         if len(fork_lane_ids) == 2:
             if self.judge_enter_fork(
-                basic_info,
                 lane_map,
                 fork_lane_ids[0],
                 fork_lane_ids[1],
                 curb_decision,
+                basic_info,
             ):
                 return True
 
@@ -69,16 +69,10 @@ class RampTagHelper:
         curb_decision: Dict,
         current_lane_seqs: List[List[int]],
         ego_path_info: EgoPathInfo,
+        basic_info: BasicInfo,
     ) -> bool:
         corr_lane_id = ego_path_info.corr_lane_id
         future_path = ego_path_info.future_path
-
-        # 滤掉过路口场景
-        if any(
-            juntion_id is not None
-            for juntion_id in ego_path_info.in_junction_id
-        ):
-            return False
 
         # 拿到变道后到达的lane id以及对应的点在future path上的index
         target_lane_id = -1
@@ -100,6 +94,7 @@ class RampTagHelper:
                 current_lanes[0],
                 target_lane_id,
                 curb_decision,
+                basic_info,
                 lc_point,
             ):
                 return True
@@ -128,11 +123,11 @@ class RampTagHelper:
 
     def judge_enter_fork(
         self,
-        basic_info: BasicInfo,
         lane_map: Dict,
         cur_lane_id: int,
         nearby_lane_id: int,
         curb_decision: Dict,
+        basic_info: BasicInfo,
         lc_point=None,
     ) -> bool:
         # 检查两条lane id是否在lane_map中
@@ -159,24 +154,29 @@ class RampTagHelper:
         if len(cutoff_cur_lane) < 3 or len(cutoff_nearby_lane) < 3:
             return False
 
+        # 判断两条分叉车道的距离是否大于一定阈值
         if not self.large_diff_lane(
             cutoff_cur_lane, cutoff_nearby_lane, False, 4.0, 1
         ):
             return False
 
+        # 判断future path是否经过 分叉车道中曲率较大的那条
         if not self.is_future_path_pass_through_lane_with_larger_curvature(
-            basic_info,
             cutoff_cur_lane,
             cutoff_nearby_lane,
             cur_lane_id,
             nearby_lane_id,
+            basic_info,
         ):
             return False
 
         # 检查两条分叉路之间是否有curb隔离
-        return self.is_separate_by_curb(
+        if not self.is_separate_by_curb(
             cutoff_cur_lane, cutoff_nearby_lane, curb_decision, basic_info
-        )
+        ):
+            return False
+
+        return True
 
     def judge_exit_fork(
         self,
@@ -233,7 +233,6 @@ class RampTagHelper:
                 if lane_map[lane_id]["turn"] != "NOTURN" or (
                     lane_map[lane_id]["lane_category"] != "REALITY"
                 ):
-                    # if lane_map[lane_id]["lane_category"] != "REALITY":
                     return False
 
         return True
@@ -311,31 +310,6 @@ class RampTagHelper:
 
         return stitched_lane_polyline
 
-    # def large_diff_lane(
-    #     self, cur_lane: List[List[float]], adjacent_lane: List[List[float]]
-    # ) -> bool:
-    #     min_length = min(len(cur_lane), len(adjacent_lane))
-    #     if min_length < 3:
-    #         return False
-
-    #     cur_lane_seg = cur_lane[-min_length:]
-    #     adjacent_lane_seg = adjacent_lane[-min_length:]
-
-    #     large_dist_num = 0
-    #     adjacent_linestring = LineString(adjacent_lane_seg)
-    #     for idx, point in enumerate(cur_lane_seg):
-    #         if (
-    #             idx % 2
-    #             or adjacent_linestring.distance(Point(point))
-    #             < self.large_dist_th
-    #         ):
-    #             continue
-
-    #         large_dist_num += 1
-    #         if large_dist_num > self.large_dist_num_th:
-    #             return True
-
-    #     return False
 
     def large_diff_lane(
         self,
@@ -385,29 +359,31 @@ class RampTagHelper:
 
         return nearest_idx
 
-    def future_path_bypass_curb(
-        self, basic_info: BasicInfo, valid_curb_index: List[int]
+    def is_future_path_bypass_ramp_curb(
+        self, valid_curb_index: List[int], basic_info: BasicInfo
     ) -> bool:
         future_path_curvature = basic_info.future_path_curvature
         future_path_turn_type = basic_info.future_path_turn_type
-        future_narrow_road_curb_index = basic_info.future_narrow_road_curb_index
+        future_path_nearby_curb_indexes = (
+            basic_info.future_path_nearby_curb_indexes
+        )
 
-        is_bypass_curb = False
+        is_bypass_ramp_curb = False
         for i in range(len(future_path_curvature)):
             if abs(future_path_curvature[i]) < 0.007:
                 continue
 
             if future_path_turn_type[i] > 0:
-                if future_narrow_road_curb_index[i][0] in valid_curb_index:
-                    is_bypass_curb = True
+                if future_path_nearby_curb_indexes[i][0] in valid_curb_index:
+                    is_bypass_ramp_curb = True
                     break
 
             if future_path_turn_type[i] < 0:
-                if future_narrow_road_curb_index[i][1] in valid_curb_index:
-                    is_bypass_curb = True
+                if future_path_nearby_curb_indexes[i][1] in valid_curb_index:
+                    is_bypass_ramp_curb = True
                     break
 
-        return is_bypass_curb
+        return is_bypass_ramp_curb
 
     def is_separate_by_curb(
         self,
@@ -426,19 +402,6 @@ class RampTagHelper:
         curb_segment_lengths = []
 
         enclosed_polygon = Polygon(current_polyline + nearby_polyline)
-
-        if False:
-            from matplotlib import pyplot as plt
-
-            plt.figure(figsize=(14, 12))
-            # lane1 = lane_map[178425]['polyline']
-            # lane2 = lane_map[178160]['polyline']
-            x1, y1 = zip(*current_polyline)
-            x2, y2 = zip(*nearby_polyline)
-            plt.plot(x1, y1, color="black")
-            plt.plot(x2, y2, color="blue")
-            plt.fill(*enclosed_polygon.exterior.xy, color="green", alpha=0.5)
-            plt.show()
 
         for idx, curb_lon_position in enumerate(curb_lon_positions):
             if (
@@ -462,43 +425,37 @@ class RampTagHelper:
         if sum(curb_segment_lengths) < 5.0:
             return False
 
-        if not self.future_path_bypass_curb(basic_info, valid_curb_index):
+        if min(valid_curb_lon_positions) < ego_lon_positions[0]:
             return False
 
-        return min(valid_curb_lon_positions) > ego_lon_positions[0]
+        if not self.is_future_path_bypass_ramp_curb(
+            valid_curb_index, basic_info
+        ):
+            return False
+
+        return True
 
     def is_future_path_pass_through_lane_with_larger_curvature(
         self,
-        basic_info: BasicInfo,
         current_polyline: List[List[float]],
         nearby_polyline: List[List[float]],
         cur_lane_id: int,
         nearby_lane_id: int,
+        basic_info: BasicInfo,
     ) -> bool:
-        if False:
-            from matplotlib import pyplot as plt
-            plt.figure(figsize=(14, 12))
-            # lane1 = lane_map[178425]['polyline']
-            # lane2 = lane_map[178160]['polyline']
-            x1, y1 = zip(*current_polyline)
-            x2, y2 = zip(*nearby_polyline)
-            plt.plot(x1, y1, color="black")
-            plt.plot(x2, y2, color="blue")
-            # plt.fill(*enclosed_polygon.exterior.xy, color="green", alpha=0.5)
-            plt.show()
-
-
-        laneid_corr_waypoint_num_map = basic_info.laneid_corr_waypoint_num_map
-        cur_lane_id_corr_point_num = laneid_corr_waypoint_num_map.get(
-            cur_lane_id, 0
+        lane_id_to_future_path_waypoint_count = (
+            basic_info.lane_id_to_future_path_waypoint_count
         )
-        nearby_lane_id_corr_point_num = laneid_corr_waypoint_num_map.get(
-            nearby_lane_id, 0
+        cur_lane_id_corr_waypoint_num = (
+            lane_id_to_future_path_waypoint_count.get(cur_lane_id, 0)
+        )
+        nearby_lane_id_corr_waypoint_num = (
+            lane_id_to_future_path_waypoint_count.get(nearby_lane_id, 0)
         )
 
         if (
-            cur_lane_id_corr_point_num == 0
-            and nearby_lane_id_corr_point_num == 0
+            cur_lane_id_corr_waypoint_num == 0
+            and nearby_lane_id_corr_waypoint_num == 0
         ):
             return False
 
@@ -511,20 +468,22 @@ class RampTagHelper:
             _,
         ) = calculate_future_path_curvature_and_turn_type(nearby_polyline)
 
-        cur_polyline_sum_curvature = np.sum(np.abs(cur_polyline_curvature))
-        nearby_polyline_sum_curvature = np.sum(
+        cur_polyline_sum_abs_curvature = np.sum(np.abs(cur_polyline_curvature))
+        nearby_polyline_sum_abs_curvature = np.sum(
             np.abs(nearby_polyline_curvature)
         )
 
         if (
-            cur_lane_id_corr_point_num >= nearby_lane_id_corr_point_num
-            and cur_polyline_sum_curvature > nearby_polyline_sum_curvature
+            cur_lane_id_corr_waypoint_num >= nearby_lane_id_corr_waypoint_num
+            and cur_polyline_sum_abs_curvature
+            > nearby_polyline_sum_abs_curvature
         ):
             return True
 
         if (
-            nearby_lane_id_corr_point_num > cur_lane_id_corr_point_num
-            and nearby_polyline_sum_curvature > cur_polyline_sum_curvature
+            nearby_lane_id_corr_waypoint_num > cur_lane_id_corr_waypoint_num
+            and nearby_polyline_sum_abs_curvature
+            > cur_polyline_sum_abs_curvature
         ):
             return True
 

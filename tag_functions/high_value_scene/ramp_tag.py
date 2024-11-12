@@ -32,7 +32,6 @@ def label_ramp_tag(data: TagData, basic_info: BasicInfo) -> RampTag:
     lane_map = data.label_scene.percepmap.lane_map
     current_lanes = data.label_scene.ego_obs_lane_seq_info.current_lanes
     current_lane_seqs = data.label_scene.ego_obs_lane_seq_info.current_lane_seqs
-    ego_path_info = data.label_scene.ego_path_info
     curb_decision = data.label_scene.label_res["curb_label"].get(
         "decision", None
     )
@@ -47,14 +46,7 @@ def label_ramp_tag(data: TagData, basic_info: BasicInfo) -> RampTag:
     ):
         return ramp_tag
 
-    # 判断进匝道, 情况一: cruise场景下lane一分为二，且有curb隔开
-    # 情况二: lc场景下，当前车道和目标车道间有curb隔开
-    # if ramp_tag_helper.enter_ramp_cruise(
-    #     lane_map, current_lanes, curb_decision
-    # ) or ramp_tag_helper.enter_ramp_lane_change(
-    #     lane_map, current_lanes, curb_decision, current_lane_seqs, ego_path_info
-    # ):
-    #     ramp_tag.is_enter_ramp = True
+    # 判断进匝道, cruise场景下lane一分为二，且有curb隔开
     if ramp_tag_helper.enter_ramp_cruise(
         lane_map, current_lanes, curb_decision, basic_info
     ):

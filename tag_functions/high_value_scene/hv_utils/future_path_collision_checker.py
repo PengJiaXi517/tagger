@@ -20,7 +20,7 @@ class FuturePathCollisionChecker:
         self,
         future_narrow_road_states: List[List[bool]],
         future_narrow_road_states_loose_threshold: List[List[bool]],
-        future_narrow_road_curb_index: List[List[int]],
+        future_path_nearby_curb_indexes: List[List[int]],
         collision_res: CollisionResult,
         idx: int,
     ) -> None:
@@ -30,19 +30,27 @@ class FuturePathCollisionChecker:
         if len(future_narrow_road_states_loose_threshold) <= idx:
             future_narrow_road_states_loose_threshold.append([False, False])
 
-        if len(future_narrow_road_curb_index) <= idx:
-            future_narrow_road_curb_index.append(
-                [collision_res.left_curb_index, collision_res.right_curb_index]
-            )
+        if len(future_path_nearby_curb_indexes) <= idx:
+            future_path_nearby_curb_indexes.append([None, None])
 
         future_narrow_road_states[idx][0] |= collision_res.has_obs_left_strict
         future_narrow_road_states[idx][1] |= collision_res.has_obs_right_strict
+
         future_narrow_road_states_loose_threshold[idx][
             0
         ] |= collision_res.has_obs_left_loose
         future_narrow_road_states_loose_threshold[idx][
             1
         ] |= collision_res.has_obs_right_loose
+
+        if collision_res.left_curb_index is not None:
+            future_path_nearby_curb_indexes[idx][
+                0
+            ] = collision_res.left_curb_index
+        if collision_res.right_curb_index is not None:
+            future_path_nearby_curb_indexes[idx][
+                1
+            ] = collision_res.right_curb_index
 
     def check_future_path_distance_to_curb_and_static_obs(
         self,
@@ -53,17 +61,18 @@ class FuturePathCollisionChecker:
         static_obstacles_polygons_map: Dict,
         curbs_linestring_map: Dict,
         curbs_interactive_lat_type: Dict,
-    ) -> Tuple[List[List[bool]], List[List[bool]]]:
+    ) -> Tuple[List[List[bool]], List[List[bool]], List[List[bool]]]:
         future_narrow_road_states = []
         future_narrow_road_states_loose_threshold = []
-        future_narrow_road_curb_index = []
+        future_path_nearby_curb_indexes = []
 
         collision_detector = CollisionDetector(
             params["big_car_area"],
-            params["near_static_obs_dist_strict"],
-            params["near_static_obs_dist_loose"],
-            params["near_moving_obs_dist"],
-            params["near_caution_obs_dist"],
+            params["near_static_obs_dist_strict_th"],
+            params["near_static_obs_dist_loose_th"],
+            params["near_moving_obs_dist_th"],
+            params["near_caution_obs_dist_th"],
+            params["near_ramp_curb_dist_th"],
         )
 
         for idx, (x, y) in enumerate(ego_path_info.future_path):
@@ -76,7 +85,7 @@ class FuturePathCollisionChecker:
             self.update_future_narrow_road_states(
                 future_narrow_road_states,
                 future_narrow_road_states_loose_threshold,
-                future_narrow_road_curb_index,
+                future_path_nearby_curb_indexes,
                 collision_res,
                 idx,
             )
@@ -93,7 +102,7 @@ class FuturePathCollisionChecker:
             self.update_future_narrow_road_states(
                 future_narrow_road_states,
                 future_narrow_road_states_loose_threshold,
-                future_narrow_road_curb_index,
+                future_path_nearby_curb_indexes,
                 collision_res,
                 idx,
             )
@@ -101,7 +110,7 @@ class FuturePathCollisionChecker:
         return (
             future_narrow_road_states,
             future_narrow_road_states_loose_threshold,
-            future_narrow_road_curb_index
+            future_path_nearby_curb_indexes,
         )
 
     def check_distance_to_moving_obs_for_future_states(
@@ -113,10 +122,11 @@ class FuturePathCollisionChecker:
     ) -> List[List[bool]]:
         collision_detector = CollisionDetector(
             params["big_car_area"],
-            params["near_static_obs_dist_strict"],
-            params["near_static_obs_dist_loose"],
-            params["near_moving_obs_dist"],
-            params["near_caution_obs_dist"],
+            params["near_static_obs_dist_strict_th"],
+            params["near_static_obs_dist_loose_th"],
+            params["near_moving_obs_dist_th"],
+            params["near_caution_obs_dist_th"],
+            params["near_ramp_curb_dist_th"],
         )
 
         ego_future_states = ego_obstacle["future_trajectory"]["future_states"]
