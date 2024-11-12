@@ -58,7 +58,8 @@ class BasicInfoGenerartor:
 
         # 是否通过路口
         self.basic_info.is_cross_junction = any(
-            juntion_id is not None for juntion_id in ego_path_info.in_junction_id
+            juntion_id is not None
+            for juntion_id in ego_path_info.in_junction_id
         )
 
         # 计算future path中每一个点的曲率和转向
@@ -69,6 +70,20 @@ class BasicInfoGenerartor:
             ego_path_info.future_path
         )
 
+        # 对于future path所关联的lane id，计算每条lane经过了多少个future path点
+        for lane_info in ego_path_info.corr_lane_id:
+            if lane_info is None or len(lane_info) == 0:
+                continue
+
+            lane_id = lane_info[0][0]
+            self.basic_info.lane_id_to_future_path_waypoint_count[lane_id] = (
+                self.basic_info.lane_id_to_future_path_waypoint_count.get(
+                    lane_id, 0
+                )
+                + 1
+            )
+
+        # 计算曲率绝对值的最大值，过滤曲折轨迹(比如倒车时)
         self.basic_info.max_abs_path_curvature = np.abs(
             self.basic_info.future_path_curvature
         ).max()
@@ -119,6 +134,7 @@ class BasicInfoGenerartor:
         (
             self.basic_info.future_narrow_road_states,
             self.basic_info.future_narrow_road_states_loose_threshold,
+            self.basic_info.future_path_nearby_curb_indexes,
         ) = self.future_path_collision_checker.check_future_path_distance_to_curb_and_static_obs(
             params,
             ego_path_info,

@@ -8,6 +8,7 @@ class BasicInfo:
     def __init__(self) -> None:
         self.future_narrow_road_states: List[List[bool]] = None
         self.future_narrow_road_states_loose_threshold: List[List[bool]] = None
+        self.future_path_nearby_curb_indexes: List[List[int]] = None
         self.future_bypass_junction_curb: List[bool] = None
         self.future_interaction_with_moving_obs: List[List[bool]] = None
 
@@ -34,3 +35,5 @@ class BasicInfo:
         self.lane_change_direction: LaneChangeDirection = (
             LaneChangeDirection.UNKNOWN
         )
+
+        self.lane_id_to_future_path_waypoint_count: Dict[int, int] = {}

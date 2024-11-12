@@ -69,7 +69,7 @@ def label_high_value_tag(data: TagData, params: Dict) -> Dict:
     high_value_tag.yield_vru_tag = label_yield_vru_tag(data, params)
 
     # 判断汇入汇出匝道
-    high_value_tag.ramp_tag = label_ramp_tag(data)
+    high_value_tag.ramp_tag = label_ramp_tag(data, basic_info)
 
     # future path曲率绝对值的最大值
     high_value_tag.max_abs_path_curvature = basic_info.max_abs_path_curvature
