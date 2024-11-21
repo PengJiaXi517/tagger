@@ -20,42 +20,48 @@ from tag_functions.high_value_scene.hv_utils.basic_func import (
     build_linestring_from_lane_seq_ids,
 )
 
+
 class LogExceptions(object):
     def __init__(self, callable):
         self.__callable = callable
         return
-    
+
     def error(self, msg, *args):
         return multiprocessing.get_logger().error(msg, *args)
 
     def __call__(self, *args, **kwargs):
         try:
             result = self.__callable(*args, **kwargs)
- 
+
         except Exception as e:
             self.error(traceback.format_exc())
             raise
 
         return result
- 
-    pass
+
 
 class RampTagSelector:
     def __init__(
-        self, trip_num: int, num_process: int, is_fake_path_in_lane_change: bool
+        self,
+        trip_num: int = 100,
+        num_process: int = 8,
+        is_fake_path_in_lane_change: bool = True,
+        fake_path_min_length: int = 20,
+        viz_sample_num: int = 30,
+        max_pose_l_diff: float = 1.75,
+        max_real_pose_l_diff: float = 1.75,
+        max_pose_l: float = 0.7,
+        max_mean_pose_l: float = 0.35,
     ) -> None:
-        self.trip_num: int = trip_num
-        self.num_process: int = num_process
-        self.is_fake_path_in_lane_change: bool = is_fake_path_in_lane_change
-        self.viz_sample_num: int = 30
-        self.max_pose_l_diff: float = 1.75
-        self.max_real_pose_l_diff: float = 1.75
-        self.min_arrive_length: float = 57
-        self.min_sum_path_curvature_thr: float = 0.038
-        self.max_sum_pos_curvature_diff: float = 0.005
-        self.max_sum_neg_curvature_diff: float = 0.005
-        self.max_pose_l: float = 0.7
-        self.max_mean_pose_l: float = 0.35
+        self.trip_num = trip_num
+        self.num_process = num_process
+        self.is_fake_path_in_lane_change = is_fake_path_in_lane_change
+        self.fake_path_min_length = fake_path_min_length
+        self.viz_sample_num = viz_sample_num
+        self.max_pose_l_diff = max_pose_l_diff
+        self.max_real_pose_l_diff = max_real_pose_l_diff
+        self.max_pose_l = max_pose_l
+        self.max_mean_pose_l = max_mean_pose_l
 
     def filter_invalid_sample_by_curvature(self, data: Dict) -> bool:
         if data["basic_path_tag"]["abs_sum_path_curvature"] < 0.25:
@@ -106,14 +112,6 @@ class RampTagSelector:
             ):
                 continue
 
-            # if np.abs(arrive_final_pose_l) > self.max_real_pose_l_diff:
-            #     continue
-
-            # arrive_length = lc_path_tag["arrive_length"]
-
-            # if arrive_length < self.min_arrive_length:
-            #     continue
-
             valid_labeled_lane_seq.append(lc_path_tag["labeled_lane_seq"])
 
         if len(valid_labeled_lane_seq) == 0:
@@ -122,56 +120,6 @@ class RampTagSelector:
         return True
 
     def filter_invalid_sample_by_cruise_path_tag(self, data: Dict) -> bool:
-        if not self.valid_cruise_tag(data):
-            return False
-
-        # if self.is_cruise_turn(data):
-        #     if not self.valid_cruise_turn_tag(data):
-        #         return False
-    
-        return True
-
-    def is_cruise_turn(self, data: Dict) -> bool:
-        if np.abs(
-            data["basic_path_tag"]["sum_path_curvature"]
-        ) > self.min_sum_path_curvature_thr and (
-            np.abs(
-                data["basic_path_tag"]["sum_path_curvature"]
-                - data["basic_path_tag"]["pos_sum_path_curvature"]
-            )
-            < self.max_sum_pos_curvature_diff
-            or np.abs(
-                data["basic_path_tag"]["sum_path_curvature"]
-                - data["basic_path_tag"]["neg_sum_path_curvature"]
-            )
-            < self.max_sum_neg_curvature_diff
-        ):
-            return True
-
-        return False
-
-    def valid_cruise_turn_tag(self, data: Dict) -> bool:
-        valid_labeled_lane_seq = []
-
-        for cruise_path_tag in data["cruise_path_tag"]:
-
-            if cruise_path_tag["mean_pose_l"] > self.max_mean_pose_l:
-                continue
-
-            if (
-                self.max_pose_l is not None
-                and cruise_path_tag["max_pose_l"] > self.max_pose_l
-            ):
-                continue
-
-            valid_labeled_lane_seq.append(cruise_path_tag["labeled_lane_seq"])
-
-        if len(valid_labeled_lane_seq) == 0:
-            return False
-
-        return True
-
-    def valid_cruise_tag(self, data: Dict) -> bool:
         valid_labeled_lane_seq = []
 
         for cruise_path_tag in data["cruise_path_tag"]:
@@ -213,7 +161,7 @@ class RampTagSelector:
 
         if not self.filter_invalid_sample_by_right_turn_only_tag(data):
             return False
-        
+
         if data["path_type"] == "LANE_CHANGE":
             if not self.filter_invalid_sample_by_lc_path_tag(data):
                 return False
@@ -264,29 +212,26 @@ class RampTagSelector:
         nearest_cur_lane_seq_linestring: LineString,
     ) -> List[Tuple[float, float]]:
         fake_path = [[coord for coord in pt] for pt in future_path]
-
         valid_index = -1
         distances = []
+
         for idx, point in enumerate(future_path):
             path_point = Point(point)
             dist = nearest_cur_lane_seq_linestring.distance(path_point)
             distances.append(dist)
-
             if dist > 1.0:
                 break
-            
             if dist <= 0.4:
                 valid_index = idx
-        
-        distances = distances[:max(valid_index + 1, 0)]
+
+        distances = distances[: max(valid_index + 1, 0)]
         if len(distances) > 0:
             mean_dist = sum(distances) / len(distances)
             max_dist = max(distances)
-
             if mean_dist > self.max_mean_pose_l or max_dist > self.max_pose_l:
                 valid_index = -1
 
-        fake_path = fake_path[:max(valid_index + 1, 0)]
+        fake_path = fake_path[: max(valid_index + 1, 0)]
 
         return fake_path
 
@@ -337,9 +282,11 @@ class RampTagSelector:
             fake_info.update({"fake_path": fake_path})
             fake_info.update({"fake_condition_lane_seq": nearest_cur_lane_seq})
 
-        if "fake_path" in fake_info:
-            if len(fake_info["fake_path"]) < 20:
-                return None, None
+        if (
+            "fake_path" in fake_info
+            and len(fake_info["fake_path"]) < self.fake_path_min_length
+        ):
+            return None, None
 
         # 生成网络训练所需的数据格式
         supervise_info = self.get_supervise_info(
@@ -375,7 +322,7 @@ class RampTagSelector:
                     )
                 )
 
-        path_info = {}
+        path_info = {"is_enter_ramp": True}
         if "fake_path" in fake_info:
             path_info.update({"future_path": fake_info["fake_path"]})
 
@@ -442,16 +389,12 @@ class RampTagSelector:
         tag_json_file_paths = []
 
         for root, dirs, files in os.walk(tag_data_root):
-            # if trip_num < 0:
-            #     break
             for file in files:
                 if file.endswith("tag.json"):
                     full_path = os.path.join(root, file)
                     tag_json_file_paths.append(full_path)
-                    # trip_num -= 1
 
         random.shuffle(tag_json_file_paths)
-        
         tag_json_file_paths = tag_json_file_paths[:trip_num]
 
         print("tag_json_file_paths len: ", len(tag_json_file_paths))
@@ -476,8 +419,6 @@ class RampTagSelector:
             with open(file_path, "rb") as f:
                 trip_tag_data = rapidjson.loads(f.read())
                 for ts, tag_data in trip_tag_data.items():
-                    # if ts != "1730125902791227":
-                    #     continue
                     if tag_data["ramp_tag"][
                         "is_enter_ramp"
                     ] and self.filter_invalid_sample(tag_data):
@@ -536,17 +477,6 @@ class RampTagSelector:
             pool.close()
             pool.join()
 
-        # tag_json_file_paths = [
-        #     "/mnt/train2/pnd_data/PersonalData/Ness.hu/TagRes/1112_full/merge_ret/74607_17909_Guangqi-003_kainiu_2024-10-28-22-25-46/tag.json"
-        # ]
-        # self.process_subset_files(
-        #     tag_json_file_paths,
-        #     parsed_args.config_file,
-        #     parsed_args.base_data_root,
-        #     parsed_args.condition_data_root,
-        #     parsed_args.save_root,
-        # )
-
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -590,14 +520,14 @@ if __name__ == "__main__":
         "-np",
         "--num-process",
         type=int,
-        default=8,
+        default=50,
         help="multi thread processer number",
     )
     parser.add_argument(
         "-tn",
         "--trip-num",
         type=int,
-        default=100,
+        default=500,
         help="only process trip-num trips data",
     )
     parser.add_argument(
