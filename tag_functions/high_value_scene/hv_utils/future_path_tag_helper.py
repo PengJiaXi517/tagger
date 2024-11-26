@@ -348,6 +348,8 @@ class FuturePathTagHelper:
                 curvature[curvature > 0.0].sum(),
                 curvature[curvature < 0.0].sum(),
                 curvature.sum(),
+                np.max(curvature),
+                np.min(curvature),
             )
 
         (
@@ -355,6 +357,8 @@ class FuturePathTagHelper:
             pos_curvature,
             neg_curvature,
             sum_curvature,
+            max_curvature,
+            min_curvature,
         ) = cal_curvature(data.label_scene.ego_path_info.future_path)
 
         basic_path_tag = BasicPathTag()
@@ -365,6 +369,8 @@ class FuturePathTagHelper:
         basic_path_tag.abs_sum_path_curvature = abs_curvature
         basic_path_tag.pos_sum_path_curvature = pos_curvature
         basic_path_tag.neg_sum_path_curvature = neg_curvature
+        basic_path_tag.max_path_curvature = max_curvature
+        basic_path_tag.min_path_curvature = min_curvature
 
         return basic_path_tag
 

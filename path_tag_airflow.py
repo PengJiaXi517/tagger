@@ -26,14 +26,14 @@ def trigger_dag_warper(pre_task_name, base_data_root, condition_data_root, json_
     params = dict()
     params["arg"] = f"""
           set -ex
-          pip install /mnt/train2/eric.wang/shapely-2.0.1-cp37-cp37m-manylinux_2_17_x86_64.manylinux2014_x86_64.whl
-          pip install /mnt/train2/eric.wang/jmespath-1.0.1-py3-none-any.whl
-          pip install /mnt/train2/eric.wang/pyntcloud-0.3.1-py2.py3-none-any.whl
-          pip install /mnt/train2/eric.wang/urllib3-1.26.19-py2.py3-none-any.whl
-          pip install /mnt/train2/eric.wang/botocore-1.33.13-py3-none-any.whl
-          pip install /mnt/train2/eric.wang/s3transfer-0.8.2-py3-none-any.whl
-          pip install /mnt/train2/eric.wang/boto3-1.33.1-py3-none-any.whl
-          cd /mnt/train2/RoadPercep/eric.wang/Code/path-nn-tagger/
+          pip install /mnt/train2/pnd_data/PersonalData/Ness.hu/AirflowComponents/shapely-2.0.1-cp37-cp37m-manylinux_2_17_x86_64.manylinux2014_x86_64.whl
+          pip install /mnt/train2/pnd_data/PersonalData/Ness.hu/AirflowComponents/jmespath-1.0.1-py3-none-any.whl
+          pip install /mnt/train2/pnd_data/PersonalData/Ness.hu/AirflowComponents/pyntcloud-0.3.1-py2.py3-none-any.whl
+          pip install /mnt/train2/pnd_data/PersonalData/Ness.hu/AirflowComponents/urllib3-1.26.19-py2.py3-none-any.whl
+          pip install /mnt/train2/pnd_data/PersonalData/Ness.hu/AirflowComponents/botocore-1.33.13-py3-none-any.whl
+          pip install /mnt/train2/pnd_data/PersonalData/Ness.hu/AirflowComponents/s3transfer-0.8.2-py3-none-any.whl
+          pip install /mnt/train2/pnd_data/PersonalData/Ness.hu/AirflowComponents/boto3-1.33.1-py3-none-any.whl
+          cd /mnt/openpai-team/ness.hu/airflow_workflow/path-nn-tagger/
           mpiexec --allow-run-as-root -np 12 python mpi_process.py --base_data_root {base_data_root}  --condition_data_root {condition_data_root} --json_file {json_file} --save_root {save_root} --cfg_file {cfg_file}
     """
 
@@ -61,18 +61,18 @@ if __name__ == '__main__':
         json_list = json.load(f)
 
     task_dic = {}
-    for item in json_list:
+    for item in tqdm(json_list):
         if item.split('/')[0] not in task_dic:
             task_dic[item.split('/')[0]] = [item]
         else:
             task_dic[item.split('/')[0]].append(item)
 
-    for k, v in task_dic.items():
+    for k, v in tqdm(task_dic.items()):
         with open(os.path.join(args.split_json_path, '{}.json'.format(k)), 'w') as f:
             json.dump(v, f)
 
 
-    for i, json_path in tqdm(enumerate(os.listdir(args.split_json_path))):
+    for i, json_path in tqdm(list(enumerate(os.listdir(args.split_json_path)))):
         # if 'part' in json_path:
         #     continue
         trigger_dag_warper(args.pre_task_name,

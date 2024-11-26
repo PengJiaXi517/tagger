@@ -10,6 +10,8 @@ tag_pipelines = {
     "ego_state_map_environment": {},
     "ego_state_obs_environment": {},
     "interactive_tag": {},
+    "park_check": {},
+    "traffic_start_slow_check": {},
     "label_high_value_tag": {
         "big_car_area": 18.0,
         "near_static_obs_dist_strict_th": 0.9,

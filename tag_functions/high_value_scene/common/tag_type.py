@@ -55,10 +55,12 @@ class InteractWithMovingObsTag:
 class NarrowRoadTag:
     def __init__(self) -> None:
         self.is_narrow_road: bool = False
+        self.narrow_road_count: int = 0
 
     def as_dict(self):
         return {
             "is_narrow_road": self.is_narrow_road,
+            "narrow_road_count": self.narrow_road_count,
         }
 
 
@@ -238,6 +240,8 @@ class BasicPathTag:
     abs_sum_path_curvature: float = 0.0
     pos_sum_path_curvature: float = 0.0
     neg_sum_path_curvature: float = 0.0
+    max_path_curvature: float = 0.0
+    min_path_curvature: float = 0.0
 
     def as_dict(self):
         return {
@@ -246,6 +250,8 @@ class BasicPathTag:
             "abs_sum_path_curvature": self.abs_sum_path_curvature,
             "pos_sum_path_curvature": self.pos_sum_path_curvature,
             "neg_sum_path_curvature": self.neg_sum_path_curvature,
+            "max_path_curvature": self.max_path_curvature,
+            "min_path_curvature": self.min_path_curvature,
         }
 
 
