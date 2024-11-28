@@ -170,6 +170,8 @@ class JunctionPATHTag:
     max_length_in_exit_lane: float = 0.0
     max_length_not_in_exit_lane: float = 0.0
 
+    path_distance_to_exit_lane: int = -1
+
     hit_point_num: int = 0
     min_pose_l_2_exit_lane: float = 0.0
     max_pose_l_2_exit_lane: float = 0.0
@@ -197,6 +199,8 @@ class JunctionPATHTag:
             #
             "max_length_in_exit_lane": self.max_length_in_exit_lane,
             "max_length_not_in_exit_lane": self.max_length_not_in_exit_lane,
+            #
+            "path_distance_to_exit_lane": self.path_distance_to_exit_lane,
             #
             "hit_point_num": self.hit_point_num,
             "min_pose_l_2_exit_lane": self.min_pose_l_2_exit_lane,

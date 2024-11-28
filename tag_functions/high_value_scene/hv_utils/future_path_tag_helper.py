@@ -191,6 +191,12 @@ class FuturePathTagHelper:
                 junction_path_tag.first_arrive_junction_id = in_junction_id
         junction_path_tag.label_junction_id = junction_label_info.junction_id
 
+        path_distance_to_exit_lane = -1
+        for i, in_junction_id in enumerate(ego_path_info.in_junction_id):
+            if in_junction_id is not None and in_junction_id == junction_label_info.junction_id:
+                path_distance_to_exit_lane = i
+        junction_path_tag.path_distance_to_exit_lane = path_distance_to_exit_lane
+
         if len(junction_label_info.entry_lanes) > 0:
             junction_path_tag.has_entry_lane = True
             nearest_lane_info = min(
