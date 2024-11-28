@@ -4,7 +4,7 @@ import pickle
 from typing import Dict, List, Set, Tuple, Union
 
 import numpy as np
-from shapely.geometry import LineString
+from shapely.geometry import LineString, Point
 
 
 class ConditionRes:
@@ -15,8 +15,12 @@ class ConditionRes:
                 "file_path": label["file_path"],
                 "seq_lane_ids": label["map_state"]["seq_lane_ids"],
                 "seq_lane_ids_raw": label["map_state"]["seq_lane_ids_raw"],
-                "start_lane_seqs_ind": label["obstacle_state"]["start_lane_seqs_ind"],
-                "end_lane_seqs_ind": label["obstacle_state"]["end_lane_seqs_ind"],
+                "start_lane_seqs_ind": label["obstacle_state"][
+                    "start_lane_seqs_ind"
+                ],
+                "end_lane_seqs_ind": label["obstacle_state"][
+                    "end_lane_seqs_ind"
+                ],
                 "ego_per_lane_seq_path_mask": label["obstacle_state"][
                     "ego_per_lane_seq_path_mask"
                 ],
@@ -27,7 +31,9 @@ class ConditionRes:
 
         self.file_path = condition_res["file_path"]
         self.seq_lane_ids: List[Set[int]] = condition_res["seq_lane_ids"]
-        self.seq_lane_ids_raw: List[List[int]] = condition_res["seq_lane_ids_raw"]
+        self.seq_lane_ids_raw: List[List[int]] = condition_res[
+            "seq_lane_ids_raw"
+        ]
 
         start_lane_seqs_ind = condition_res["start_lane_seqs_ind"]
         end_lane_seqs_ind = condition_res["end_lane_seqs_ind"]
@@ -39,35 +45,37 @@ class ConditionRes:
         ):
             if start_idx == -1 and end_idx == -1:
                 continue
-            self.lane_seq_pair.append((start_idx, end_idx, ego_per_lane_seq_mask[idx]))
+            self.lane_seq_pair.append(
+                (start_idx, end_idx, ego_per_lane_seq_mask[idx])
+            )
 
     def __repr__(self) -> str:
-        return (
-            f"{self.file_path}, {len(self.seq_lane_ids_raw)}, {len(self.lane_seq_pair)}"
-        )
+        return f"{self.file_path}, {len(self.seq_lane_ids_raw)}, {len(self.lane_seq_pair)}"
 
 
 class EgoPathInfo:
     def __init__(self, ego_path_dict: Dict, consider_length=34) -> None:
-        self.future_path: List[Tuple[float, float]] = ego_path_dict["future_path"][
-            :consider_length
-        ]
+        self.future_path: List[Tuple[float, float]] = ego_path_dict[
+            "future_path"
+        ][:consider_length]
         if len(self.future_path) <= 1:
             self.future_path.append(self.future_path[-1])
         self.future_path_linestring: LineString = LineString(self.future_path)
         self.in_junction_id: List[Union[None, str, int]] = ego_path_dict[
             "in_junction_id"
         ][:consider_length]
-        self.corr_frame_idx: List[Union[None, int]] = ego_path_dict["corr_frame_idx"][
+        self.corr_frame_idx: List[Union[None, int]] = ego_path_dict[
+            "corr_frame_idx"
+        ][:consider_length]
+        self.corr_lane_id: List[
+            List[Union[None, Tuple[Union[str, int], float]]]
+        ] = (ego_path_dict["corr_lane_id"])[:consider_length]
+        self.vt_profile: List[float] = ego_path_dict["vt_profile"][
             :consider_length
         ]
-        self.corr_lane_id: List[List[Union[None, Tuple[Union[str, int], float]]]] = (
-            ego_path_dict["corr_lane_id"]
-        )[:consider_length]
-        self.vt_profile: List[float] = ego_path_dict["vt_profile"][:consider_length]
-        self.lane_seq_valid_len: List[Tuple[List[str], int, int]] = ego_path_dict[
-            "lane_seq_valid_len"
-        ]
+        self.lane_seq_valid_len: List[
+            Tuple[List[str], int, int]
+        ] = ego_path_dict["lane_seq_valid_len"]
         self.collision_to_curb: bool = ego_path_dict["collision_to_curb"]
 
 
@@ -115,21 +123,112 @@ class EgoObstacleLaneSeqInfo:
 
         for current_lane_seq in tmp_current_lane_seqs:
             if not any(
-                [set(current_lane_seq) == set(l) for l in self.current_lane_seqs]
+                [
+                    set(current_lane_seq) == set(l)
+                    for l in self.current_lane_seqs
+                ]
             ):
                 self.current_lane_seqs.append(current_lane_seq)
 
         for nearby_lane_seq in tmp_nearby_lane_seqs:
-            if not any([set(nearby_lane_seq) == set(l) for l in self.nearby_lane_seqs]):
+            if not any(
+                [set(nearby_lane_seq) == set(l) for l in self.nearby_lane_seqs]
+            ):
                 self.nearby_lane_seqs.append(nearby_lane_seq)
 
 
 class JunctionLabelInfo:
-    def __init__(self, junction_info, percep_map: PercepMap) -> None:
+    def __init__(
+        self, junction_info, percep_map: PercepMap, ego_path_info: EgoPathInfo
+    ) -> None:
         self.junction_goal = junction_info["junction_goal"]
         self.junction_id = junction_info["junction_id"]
         self.entry_lanes = junction_info["entry_lanes"]
         self.exit_lanes = junction_info["exit_lanes"]
+        self.waiting_area_lane_info = {}
+        self.has_waiting_area = False
+
+        for entry_lane in self.entry_lanes:
+            entry_lane_id = entry_lane["lane_id"]
+            cur_entry_lane = percep_map.lane_map[entry_lane_id]
+            if cur_entry_lane["lane_category"] == "REALITY" and (
+                cur_entry_lane["type"] == "WAIT_LEFT"
+                or cur_entry_lane["type"] == "WAIT_RIGHT"
+            ):
+                self.has_waiting_area = True
+                self.add_waiting_lane_info(
+                    ego_path_info,
+                    cur_entry_lane,
+                    entry_lane_id,
+                    entry_lane_id,
+                    entry_lane["pose_s"],
+                    entry_lane["pose_l"],
+                )
+
+            if len(cur_entry_lane["successor_id"]) == 0:
+                continue
+
+            for succ_id in cur_entry_lane["successor_id"]:
+                succ_lane = percep_map.lane_map[succ_id]
+                if succ_lane["lane_category"] == "REALITY" and (
+                    succ_lane["type"] == "WAIT_LEFT"
+                    or succ_lane["type"] == "WAIT_RIGHT"
+                ):
+                    self.has_waiting_area = True
+                    self.add_waiting_lane_info(
+                        ego_path_info, succ_lane, succ_id, entry_lane_id
+                    )
+
+    def add_waiting_lane_info(
+        self,
+        ego_path_info: EgoPathInfo,
+        waiting_lane: Dict,
+        waiting_lane_id: int,
+        cur_entry_lane_id: int,
+        pose_s=None,
+        pose_l=None,
+    ) -> None:
+        if len(waiting_lane["polyline"]) <= 2:
+            return
+
+        waiting_lane_linestring = LineString(waiting_lane["polyline"])
+
+        if pose_s is None or pose_l is None:
+            corr_lane_id = ego_path_info.corr_lane_id
+            waiting_lane_corr_final_future_point_idx = -1
+
+            for idx, corr_lane_info in enumerate(corr_lane_id):
+                if corr_lane_info is None or len(corr_lane_info) == 0:
+                    break
+                if corr_lane_info[0][0] == waiting_lane_id:
+                    waiting_lane_corr_final_future_point_idx = idx
+                    pose_l = corr_lane_info[0][1]
+
+            if waiting_lane_corr_final_future_point_idx != -1:
+                pose_s = min(
+                    max(
+                        0,
+                        waiting_lane_linestring.project(
+                            Point(
+                                ego_path_info.future_path[
+                                    waiting_lane_corr_final_future_point_idx
+                                ]
+                            )
+                        ),
+                    ),
+                    waiting_lane_linestring.length,
+                )
+
+        waiting_lane_info = (
+            waiting_lane_id,
+            pose_s,
+            pose_l.item() if pose_l is not None else None,
+            waiting_lane_linestring.length,
+        )
+
+        if cur_entry_lane_id not in self.waiting_area_lane_info:
+            self.waiting_area_lane_info[cur_entry_lane_id] = []
+        self.waiting_area_lane_info[cur_entry_lane_id].append(waiting_lane_info)
 
 
 class LabelScene:
@@ -157,7 +256,9 @@ class LabelScene:
             label["obstacles"][-9], self.percepmap
         )
         self.junction_label_info = JunctionLabelInfo(
-            label["obstacles"][-9]["junction_info"], self.percepmap
+            label["obstacles"][-9]["junction_info"],
+            self.percepmap,
+            self.ego_path_info,
         )
 
         from raw_data_preprocess.compose_pipelines import compose_pipelines
@@ -182,4 +283,6 @@ class TagData:
         self.label_scene: LabelScene = LabelScene(
             label_path, s3_client, max_valid_point_num
         )
-        self.condition_res: ConditionRes = ConditionRes(self.label_scene.label_res)
+        self.condition_res: ConditionRes = ConditionRes(
+            self.label_scene.label_res
+        )

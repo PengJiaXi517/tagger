@@ -219,6 +219,16 @@ class FuturePathTagHelper:
                         )
                         break
 
+            junction_path_tag.has_waiting_area = (
+                junction_label_info.has_waiting_area
+            )
+
+            junction_path_tag.waiting_area_lane_info = (
+                junction_label_info.waiting_area_lane_info.get(
+                    nearest_lane_id, []
+                )
+            )
+
         if len(junction_label_info.exit_lanes) > 0:
             junction_path_tag.has_exit_lane = True
 
