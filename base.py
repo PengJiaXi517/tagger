@@ -154,6 +154,7 @@ class JunctionLabelInfo:
             if cur_entry_lane["lane_category"] == "REALITY" and (
                 cur_entry_lane["type"] == "WAIT_LEFT"
                 or cur_entry_lane["type"] == "WAIT_RIGHT"
+                or cur_entry_lane["type"] == "WAIT_FORWARD"
             ):
                 self.has_waiting_area = True
                 self.add_waiting_lane_info(
@@ -173,6 +174,7 @@ class JunctionLabelInfo:
                 if succ_lane["lane_category"] == "REALITY" and (
                     succ_lane["type"] == "WAIT_LEFT"
                     or succ_lane["type"] == "WAIT_RIGHT"
+                    or succ_lane["type"] == "WAIT_FORWARD"
                 ):
                     self.has_waiting_area = True
                     self.add_waiting_lane_info(
