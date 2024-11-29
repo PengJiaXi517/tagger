@@ -350,7 +350,7 @@ class FuturePathTagHelper:
             future_path: List[Tuple[float, float]]
         ) -> Tuple[float, ...]:
             if len(future_path) <= 4:
-                return 0.0, 0.0, 0.0, 0.0
+                return 0.0, 0.0, 0.0, 0.0, 0.0, 0.0
             path_points = np.array(future_path)
 
             diff_points = path_points[1:] - path_points[:-1]

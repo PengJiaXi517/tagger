@@ -129,6 +129,10 @@ class LcPATHTag:
             "labeled_lane_seq": self.labeled_lane_seq,
         }
 
+class ConditionLineCorrType(Enum):
+    NONE = 0
+    START = 1
+    END = 2
 
 class LaneChangeDirection(Enum):
     UNKNOWN = -1

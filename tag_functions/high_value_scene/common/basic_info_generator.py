@@ -2,7 +2,12 @@ from shapely.geometry import LineString, Point
 from typing import Dict, List, Tuple
 import numpy as np
 from base import TagData
-from tag_functions.high_value_scene.common.basic_info import BasicInfo, ConditionLineCorrType
+from tag_functions.high_value_scene.common.basic_info import (
+    BasicInfo,
+)
+from tag_functions.high_value_scene.common.tag_type import (
+    ConditionLineCorrType,
+)
 from tag_functions.high_value_scene.hv_utils.obstacle_filter import (
     ObstacleFilter,
 )
@@ -177,13 +182,11 @@ class BasicInfoGenerartor:
         # 找到离future path横向距离最近的condition lane seq linestring
         (
             self.basic_info.nearest_condition_linestring,
-            self.basic_info.nearest_condition_linestring_corr_type
-        ) = (
-            find_nearest_condition_linestring(
-                data,
-                start_lane_seq_ids,
-                end_lane_seq_ids,
-            )
+            self.basic_info.nearest_condition_linestring_corr_type,
+        ) = find_nearest_condition_linestring(
+            data,
+            start_lane_seq_ids,
+            end_lane_seq_ids,
         )
 
         # 计算future path的每一个点的sl坐标，以及在condition linestring上的投影点
@@ -192,11 +195,18 @@ class BasicInfoGenerartor:
             for point in future_path:
                 path_point = Point(point)
                 project_success = False
-                proj_s_list, proj_l_list, linestring_idx_list, corr_line_type = [], [], [], []
+                (
+                    proj_s_list,
+                    proj_l_list,
+                    linestring_idx_list,
+                    corr_line_type,
+                ) = ([], [], [], [])
 
                 for idx, (linestring, corr_type) in enumerate(
-                    self.basic_info.nearest_condition_linestring,
-                    self.basic_info.nearest_condition_linestring_corr_type,
+                    zip(
+                        self.basic_info.nearest_condition_linestring,
+                        self.basic_info.nearest_condition_linestring_corr_type,
+                    )
                 ):
                     (
                         proj_s,
@@ -220,14 +230,18 @@ class BasicInfoGenerartor:
                     self.basic_info.future_path_points_sl_coordinate_projected_to_condition.append(
                         (min_proj_s, min_proj_l, corr_point)
                     )
-                    self.basic_info.future_path_points_sl_coordinate_projected_to_condition_corr_type.append(corr_line_type[min_proj_l_index])
+                    self.basic_info.future_path_points_sl_coordinate_projected_to_condition_corr_type.append(
+                        corr_line_type[min_proj_l_index]
+                    )
                     project_success = True
 
                 if not project_success:
                     self.basic_info.future_path_points_sl_coordinate_projected_to_condition.append(
                         (None, None, None)
                     )
-                    self.basic_info.future_path_points_sl_coordinate_projected_to_condition_corr_type.append(ConditionLineCorrType.NONE)
+                    self.basic_info.future_path_points_sl_coordinate_projected_to_condition_corr_type.append(
+                        ConditionLineCorrType.NONE
+                    )
 
     def calculate_lane_change_basic_info(self) -> None:
         self.basic_info.lane_change_direction = judge_lane_change_direction(
