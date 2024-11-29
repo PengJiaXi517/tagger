@@ -5,6 +5,7 @@ from shapely.geometry import LineString, Point, Polygon
 from base import TagData
 from collections import defaultdict
 from tag_functions.high_value_scene.common.tag_type import LaneChangeDirection
+from tag_functions.high_value_scene.common.basic_info import ConditionLineCorrType
 
 
 def is_obstacle_always_static(obstacle: Dict) -> bool:
@@ -226,6 +227,7 @@ def find_nearest_condition_linestring(
 
     min_lateral_dist = np.inf
     nearest_condition_linestring = None
+    nearest_condition_linestring_corr_type = None
 
     for start_ids, end_ids in zip(
         condition_start_lane_seq_ids, condition_end_lane_seq_ids
@@ -233,8 +235,8 @@ def find_nearest_condition_linestring(
         condition_linestring = [
             linestring
             for linestring in [
-                build_linestring_from_lane_seq_ids(lane_map, start_ids),
-                build_linestring_from_lane_seq_ids(lane_map, end_ids),
+                (build_linestring_from_lane_seq_ids(lane_map, start_ids), ConditionLineCorrType.START),
+                (build_linestring_from_lane_seq_ids(lane_map, end_ids), ConditionLineCorrType.END),
             ]
             if linestring is not None
         ]
@@ -250,6 +252,7 @@ def find_nearest_condition_linestring(
 
         if 0 < sum_proj_l < min_lateral_dist:
             min_lateral_dist = sum_proj_l
-            nearest_condition_linestring = condition_linestring
+            nearest_condition_linestring = [c[0] for c in condition_linestring]
+            nearest_condition_linestring_corr_type = [c[1] for c in condition_linestring]
 
-    return nearest_condition_linestring
+    return nearest_condition_linestring, nearest_condition_linestring_corr_type
