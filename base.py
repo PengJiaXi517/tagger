@@ -159,8 +159,8 @@ class JunctionLabelInfo:
                     cur_entry_lane,
                     entry_lane_id,
                     entry_lane_id,
-                    entry_lane["pose_s"],
-                    entry_lane["pose_l"],
+                    float(entry_lane["pose_s"]),
+                    float(entry_lane["pose_l"]),
                 )
 
             if len(cur_entry_lane["successor_id"]) == 0:
@@ -199,21 +199,23 @@ class JunctionLabelInfo:
                     break
                 if corr_lane_info[0][0] == waiting_lane_id:
                     waiting_lane_corr_final_future_point_idx = idx
-                    pose_l = corr_lane_info[0][1]
+                    pose_l = float(corr_lane_info[0][1])
 
             if waiting_lane_corr_final_future_point_idx != -1:
-                pose_s = waiting_lane_linestring.project(
-                    Point(
-                        ego_path_info.future_path[
-                            waiting_lane_corr_final_future_point_idx
-                        ]
+                pose_s = float(
+                    waiting_lane_linestring.project(
+                        Point(
+                            ego_path_info.future_path[
+                                waiting_lane_corr_final_future_point_idx
+                            ]
+                        )
                     )
                 )
 
         waiting_lane_info = (
             waiting_lane_id,
             pose_s,
-            pose_l.item() if pose_l is not None else None,
+            pose_l,
             waiting_lane_linestring.length,
         )
 
