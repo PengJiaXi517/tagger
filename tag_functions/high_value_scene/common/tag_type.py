@@ -95,6 +95,7 @@ class CruisePATHTag:
     max_pose_l: float = 0.0
     mean_pose_l: float = 0.0
     max_continuous_length_on_lane: float = 0.0
+    latest_on_percep_lane_point_idx: int = -1
     labeled_lane_seq: List[int] = field(default_factory=list)
 
     def as_dict(self):
@@ -104,6 +105,7 @@ class CruisePATHTag:
             "max_pose_l": self.max_pose_l,
             "mean_pose_l": self.mean_pose_l,
             "max_continuous_length_on_lane": self.max_continuous_length_on_lane,
+            "latest_on_percep_lane_point_idx": self.latest_on_percep_lane_point_idx,
             "labeled_lane_seq": self.labeled_lane_seq,
         }
 

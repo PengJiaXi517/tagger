@@ -76,12 +76,19 @@ class FuturePathTagHelper:
             ]
 
             pose_ls = []
+            latest_on_percep_lane_point_idx = -1
             for i in range(num_points_on_lane):
                 point = Point(path_line_string.coords[i])
+                
+                l_dis = [pl.distance(point) for pl in polylines if 0 < pl.project(point) < pl.length]
+                
+                if len(l_dis) > 0:
+                    curr_pose_l = np.min(l_dis)
 
-                curr_pose_l = np.min([pl.distance(point) for pl in polylines])
+                    latest_on_percep_lane_point_idx = i
+                    pose_ls.append(curr_pose_l)
+            cruise_tag.latest_on_percep_lane_point_idx = latest_on_percep_lane_point_idx
 
-                pose_ls.append(curr_pose_l)
             if len(pose_ls) > 0:
                 cruise_tag.percep_pose_l = pose_ls[-1]
                 cruise_tag.max_pose_l = np.max(pose_ls)
