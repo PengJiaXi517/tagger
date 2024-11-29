@@ -146,17 +146,14 @@ class JunctionLabelInfo:
         self.entry_lanes = junction_info["entry_lanes"]
         self.exit_lanes = junction_info["exit_lanes"]
         self.waiting_area_lane_info = {}
-        self.has_waiting_area = False
 
         for entry_lane in self.entry_lanes:
             entry_lane_id = entry_lane["lane_id"]
             cur_entry_lane = percep_map.lane_map[entry_lane_id]
             if cur_entry_lane["lane_category"] == "REALITY" and (
-                cur_entry_lane["type"] == "WAIT_LEFT"
-                or cur_entry_lane["type"] == "WAIT_RIGHT"
-                or cur_entry_lane["type"] == "WAIT_FORWARD"
+                cur_entry_lane["type"]
+                in ["WAIT_LEFT", "WAIT_RIGHT", "WAIT_FORWARD"]
             ):
-                self.has_waiting_area = True
                 self.add_waiting_lane_info(
                     ego_path_info,
                     cur_entry_lane,
@@ -172,11 +169,9 @@ class JunctionLabelInfo:
             for succ_id in cur_entry_lane["successor_id"]:
                 succ_lane = percep_map.lane_map[succ_id]
                 if succ_lane["lane_category"] == "REALITY" and (
-                    succ_lane["type"] == "WAIT_LEFT"
-                    or succ_lane["type"] == "WAIT_RIGHT"
-                    or succ_lane["type"] == "WAIT_FORWARD"
+                    succ_lane["type"]
+                    in ["WAIT_LEFT", "WAIT_RIGHT", "WAIT_FORWARD"]
                 ):
-                    self.has_waiting_area = True
                     self.add_waiting_lane_info(
                         ego_path_info, succ_lane, succ_id, entry_lane_id
                     )
@@ -207,18 +202,12 @@ class JunctionLabelInfo:
                     pose_l = corr_lane_info[0][1]
 
             if waiting_lane_corr_final_future_point_idx != -1:
-                pose_s = min(
-                    max(
-                        0,
-                        waiting_lane_linestring.project(
-                            Point(
-                                ego_path_info.future_path[
-                                    waiting_lane_corr_final_future_point_idx
-                                ]
-                            )
-                        ),
-                    ),
-                    waiting_lane_linestring.length,
+                pose_s = waiting_lane_linestring.project(
+                    Point(
+                        ego_path_info.future_path[
+                            waiting_lane_corr_final_future_point_idx
+                        ]
+                    )
                 )
 
         waiting_lane_info = (
