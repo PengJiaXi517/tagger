@@ -99,17 +99,15 @@ class RightTurnOnlyTagHelper:
         ):
             return target_linestring
 
-        (
+        condition_lane_is_in_left = False
+        for (
             _,
             proj_l,
             _,
-        ) = basic_info.future_path_points_sl_coordinate_projected_to_condition[
-            0
-        ]
-
-        condition_lane_is_in_left = (
-            True if (proj_l is not None and proj_l < -1.75) else False
-        )
+        ) in basic_info.future_path_points_sl_coordinate_projected_to_condition:
+            if proj_l is not None and proj_l < -1.75:
+                condition_lane_is_in_left = True
+                break
 
         # 如果目标车道在左边，则认为是出右转专用道后的变道行为，用current_lane_seqs
         if condition_lane_is_in_left:

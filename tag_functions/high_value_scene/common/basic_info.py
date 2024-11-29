@@ -2,6 +2,7 @@ from shapely.geometry import LineString, Polygon, Point
 from typing import Dict, List, Tuple
 import numpy as np
 from tag_functions.high_value_scene.common.tag_type import LaneChangeDirection
+from tag_functions.high_value_scene.common.tag_type import ConditionLineCorrType
 
 
 class BasicInfo:
@@ -28,8 +29,14 @@ class BasicInfo:
         self.is_ego_vehicle_always_moving: bool = False
 
         self.nearest_condition_linestring: List[LineString] = None
+        self.nearest_condition_linestring_corr_type: List[
+            ConditionLineCorrType
+        ] = None
         self.future_path_points_sl_coordinate_projected_to_condition: List[
             Tuple[float, float, Point]
+        ] = []
+        self.future_path_points_sl_coordinate_projected_to_condition_corr_type: List[
+            ConditionLineCorrType
         ] = []
 
         self.lane_change_direction: LaneChangeDirection = (

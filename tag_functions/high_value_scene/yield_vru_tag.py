@@ -11,32 +11,31 @@ from tag_functions.high_value_scene.hv_utils.obstacle_filter import (
 
 
 class YieldVruTagHelper:
-    def __init__(self) -> None:
-        pass
+    def __init__(
+        self,
+        intersection_point_dist_thr: float = 12.5,
+        vel_diff_between_cur_and_stop: float = 1.0,
+    ) -> None:
+        self.intersection_point_dist_thr = intersection_point_dist_thr
+        self.vel_diff_between_cur_and_stop = vel_diff_between_cur_and_stop
 
     def is_ego_vehicle_braking(
-        self, ego_future_states: List[Dict]
+        self, ego_future_states: List[Dict], ego_history_states: List[Dict]
     ) -> Tuple[bool, Point, int]:
-        speeds = []
         is_braking = False
         stop_point = None
         stop_idx = None
 
-        for idx, state in enumerate(ego_future_states):
-            speed = np.linalg.norm([state["vx"], state["vy"]])
-            speeds.append(speed)
+        ego_future_states_5s = ego_future_states[:50]
+        cur_ego_state = ego_history_states[-1]
+        cur_ego_vel = np.linalg.norm([cur_ego_state["vx"], cur_ego_state["vy"]])
 
-            if speed < 0.2:
-                if len(speeds) < 3 or abs(speeds[-1] - speeds[0]) < 0.3:
-                    return False, None, None
+        for idx, state in enumerate(ego_future_states_5s):
+            vel = np.linalg.norm([state["vx"], state["vy"]])
+            if vel < 0.3:
+                if abs(cur_ego_vel - vel) > self.vel_diff_between_cur_and_stop:
+                    is_braking = True
 
-                speed_diff = [
-                    speeds[i] - speeds[i + 1] for i in range(len(speeds) - 1)
-                ]
-
-                is_braking = (
-                    sum(1 for v in speed_diff if v >= 0) / len(speed_diff)
-                ) > 0.7
                 stop_point = Point([state["x"], state["y"]])
                 stop_idx = idx
                 break
@@ -73,7 +72,8 @@ class YieldVruTagHelper:
             intersection_pt = obs_polyline.intersection(future_path_linestring)
             if (
                 not intersection_pt.is_empty
-                and stop_point.distance(intersection_pt) < 5
+                and stop_point.distance(intersection_pt)
+                < self.intersection_point_dist_thr
             ):
                 return True
 
@@ -87,6 +87,7 @@ def label_yield_vru_tag(data: TagData, params: Dict) -> YieldVRUTag:
         data.label_scene.ego_path_info.future_path_linestring
     )
     ego_future_states = obstacles[-9]["future_trajectory"]["future_states"]
+    ego_history_states = obstacles[-9]["features"]["history_states"]
     yield_vru_tag_helper = YieldVruTagHelper()
 
     # 判断是否有减速行为，并记录刹停点以及刹停点时刻在future states中的索引
@@ -94,7 +95,9 @@ def label_yield_vru_tag(data: TagData, params: Dict) -> YieldVRUTag:
         is_braking,
         stop_point,
         stop_idx,
-    ) = yield_vru_tag_helper.is_ego_vehicle_braking(ego_future_states)
+    ) = yield_vru_tag_helper.is_ego_vehicle_braking(
+        ego_future_states, ego_history_states
+    )
 
     if not is_braking or stop_point is None:
         return yield_vru_tag

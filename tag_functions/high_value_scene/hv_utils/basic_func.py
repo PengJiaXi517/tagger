@@ -5,6 +5,9 @@ from shapely.geometry import LineString, Point, Polygon
 from base import TagData
 from collections import defaultdict
 from tag_functions.high_value_scene.common.tag_type import LaneChangeDirection
+from tag_functions.high_value_scene.common.basic_info import (
+    ConditionLineCorrType,
+)
 
 
 def is_obstacle_always_static(obstacle: Dict) -> bool:
@@ -197,22 +200,28 @@ def distance_point_to_linestring_list(
 def judge_lane_change_direction(
     future_path_points_sl_coordinate_projected_to_condition: List[
         Tuple[float, float, Point]
-    ]
+    ],
+    future_path_points_sl_coordinate_projected_to_condition_corr_type: List[
+        ConditionLineCorrType
+    ],
 ) -> LaneChangeDirection:
+    lane_change_direction = LaneChangeDirection.UNKNOWN
+    
     if len(future_path_points_sl_coordinate_projected_to_condition) == 0:
-        return -1
+        return lane_change_direction
 
-    _, proj_l, _ = future_path_points_sl_coordinate_projected_to_condition[0]
-
-    if proj_l is None:
-        return -1
-
-    lane_change_direction = (
-        LaneChangeDirection.LANE_CHANGE_TO_RIGHT
-        if proj_l > 0
-        else LaneChangeDirection.LANE_CHANGE_TO_LEFT
-    )
-
+    for (_, proj_l, _), corr_type in zip(
+        future_path_points_sl_coordinate_projected_to_condition,
+        future_path_points_sl_coordinate_projected_to_condition_corr_type,
+    ):
+        if proj_l is not None and corr_type == ConditionLineCorrType.START:
+            lane_change_direction = (
+                LaneChangeDirection.LANE_CHANGE_TO_RIGHT
+                if proj_l > 0
+                else LaneChangeDirection.LANE_CHANGE_TO_LEFT
+            )
+            break
+    
     return lane_change_direction
 
 
@@ -226,6 +235,7 @@ def find_nearest_condition_linestring(
 
     min_lateral_dist = np.inf
     nearest_condition_linestring = None
+    nearest_condition_linestring_corr_type = None
 
     for start_ids, end_ids in zip(
         condition_start_lane_seq_ids, condition_end_lane_seq_ids
@@ -233,16 +243,22 @@ def find_nearest_condition_linestring(
         condition_linestring = [
             linestring
             for linestring in [
-                build_linestring_from_lane_seq_ids(lane_map, start_ids),
-                build_linestring_from_lane_seq_ids(lane_map, end_ids),
+                (
+                    build_linestring_from_lane_seq_ids(lane_map, start_ids),
+                    ConditionLineCorrType.START,
+                ),
+                (
+                    build_linestring_from_lane_seq_ids(lane_map, end_ids),
+                    ConditionLineCorrType.END,
+                ),
             ]
-            if linestring is not None
+            if linestring[0] is not None
         ]
 
         sum_proj_l = 0
         for point in future_path:
             path_point = Point(point)
-            for linestring in condition_linestring:
+            for linestring, corr_type in condition_linestring:
                 proj_s = linestring.project(path_point)
                 if 0 < proj_s < linestring.length:
                     sum_proj_l += linestring.distance(path_point)
@@ -250,6 +266,9 @@ def find_nearest_condition_linestring(
 
         if 0 < sum_proj_l < min_lateral_dist:
             min_lateral_dist = sum_proj_l
-            nearest_condition_linestring = condition_linestring
+            nearest_condition_linestring = [c[0] for c in condition_linestring]
+            nearest_condition_linestring_corr_type = [
+                c[1] for c in condition_linestring
+            ]
 
-    return nearest_condition_linestring
+    return nearest_condition_linestring, nearest_condition_linestring_corr_type

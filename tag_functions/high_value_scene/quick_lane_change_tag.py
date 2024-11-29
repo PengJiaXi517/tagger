@@ -6,6 +6,7 @@ from tag_functions.high_value_scene.common.tag_type import (
     FuturePathTag,
     FuturePATHType,
     LaneChangeDirection,
+    ConditionLineCorrType,
 )
 from tag_functions.high_value_scene.common.basic_info import BasicInfo
 
@@ -64,22 +65,25 @@ class QuickLaneChangeTagHelper:
         future_path_points_sl_coordinate_projected_to_condition: List[
             Tuple[float, float, Point]
         ],
+        future_path_points_sl_coordinate_projected_to_condition_corr_type: List[
+            ConditionLineCorrType
+        ],
     ) -> int:
-        if (
-            len(future_path_points_sl_coordinate_projected_to_condition)
-            < self.consider_future_index_num
-        ):
-            return -1
-
         distance_to_condition_linestring = []
-        for (
-            _,
-            proj_l,
-            _,
-        ) in future_path_points_sl_coordinate_projected_to_condition:
-            if proj_l is None:
+        has_start_condition = False
+        for (_, proj_l, _,), corr_type in zip(
+            future_path_points_sl_coordinate_projected_to_condition,
+            future_path_points_sl_coordinate_projected_to_condition_corr_type,
+        ):
+            if has_start_condition and proj_l is None:
                 break
-            distance_to_condition_linestring.append(abs(proj_l))
+
+            if corr_type == ConditionLineCorrType.START:
+                has_start_condition = True
+                distance_to_condition_linestring.append(abs(proj_l))
+
+        if len(distance_to_condition_linestring) < 4:
+            return -1
 
         distance_diffs = [
             distance_to_condition_linestring[i]
@@ -88,7 +92,7 @@ class QuickLaneChangeTagHelper:
         ]
 
         lane_change_begin_index = -1
-        for i in range(len(distance_diffs) - self.consider_future_index_num):
+        for i in range(len(distance_diffs) - 2):
             if distance_diffs[i] > self.delta_dist_threshold_low:
                 continue
 
@@ -102,7 +106,7 @@ class QuickLaneChangeTagHelper:
                     for d in future_distance_diffs
                     if d <= self.delta_dist_threshold_medium
                 )
-                > 0.8 * self.consider_future_index_num
+                > 0.8 * len(future_distance_diffs)
             ):
                 lane_change_begin_index = i
                 break
@@ -124,6 +128,7 @@ def label_quick_lane_change_tag(
     # 判断是否为变道场景
     if future_path_tag.path_type not in [
         FuturePATHType.LANE_CHANGE,
+        FuturePATHType.CROSS_JUNCTION_LC,
     ]:
         return quick_lane_chanege_tag
 
@@ -135,10 +140,9 @@ def label_quick_lane_change_tag(
         return quick_lane_chanege_tag
 
     # 计算开始变道的位置在future path中的index
-    lane_change_begin_index = (
-        quick_lane_chanege_tag_helper.judge_lane_change_begin_index(
-            basic_info.future_path_points_sl_coordinate_projected_to_condition
-        )
+    lane_change_begin_index = quick_lane_chanege_tag_helper.judge_lane_change_begin_index(
+        basic_info.future_path_points_sl_coordinate_projected_to_condition,
+        basic_info.future_path_points_sl_coordinate_projected_to_condition_corr_type,
     )
     if lane_change_begin_index == -1:
         return quick_lane_chanege_tag

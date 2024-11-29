@@ -20,7 +20,7 @@ tag_pipelines = {
         "near_caution_obs_dist_th": 1.0,
         "near_ramp_curb_dist_th": 3.5,
         "large_curvature_threshold": 0.05,
-        "time_window_bef_stop": 2e6,
+        "time_window_bef_stop": 3e6,
         "sample_point_length": 1.0,
     },
 }
