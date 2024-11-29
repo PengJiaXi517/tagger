@@ -245,5 +245,6 @@ class BasicInfoGenerartor:
 
     def calculate_lane_change_basic_info(self) -> None:
         self.basic_info.lane_change_direction = judge_lane_change_direction(
-            self.basic_info.future_path_points_sl_coordinate_projected_to_condition
+            self.basic_info.future_path_points_sl_coordinate_projected_to_condition,
+            self.basic_info.future_path_points_sl_coordinate_projected_to_condition_corr_type
         )

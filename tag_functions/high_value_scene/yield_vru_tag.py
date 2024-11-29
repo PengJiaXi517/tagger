@@ -14,7 +14,7 @@ class YieldVruTagHelper:
     def __init__(
         self,
         intersection_point_dist_thr: float = 12.5,
-        vel_diff_between_cur_and_stop: float = 2.0,
+        vel_diff_between_cur_and_stop: float = 1.0,
     ) -> None:
         self.intersection_point_dist_thr = intersection_point_dist_thr
         self.vel_diff_between_cur_and_stop = vel_diff_between_cur_and_stop

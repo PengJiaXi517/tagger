@@ -200,13 +200,21 @@ def distance_point_to_linestring_list(
 def judge_lane_change_direction(
     future_path_points_sl_coordinate_projected_to_condition: List[
         Tuple[float, float, Point]
-    ]
+    ],
+    future_path_points_sl_coordinate_projected_to_condition_corr_type: List[
+        ConditionLineCorrType
+    ],
 ) -> LaneChangeDirection:
+    lane_change_direction = LaneChangeDirection.UNKNOWN
+    
     if len(future_path_points_sl_coordinate_projected_to_condition) == 0:
-        return -1
+        return lane_change_direction
 
-    for _, proj_l, _ in future_path_points_sl_coordinate_projected_to_condition:
-        if proj_l is not None:
+    for (_, proj_l, _), corr_type in zip(
+        future_path_points_sl_coordinate_projected_to_condition,
+        future_path_points_sl_coordinate_projected_to_condition_corr_type,
+    ):
+        if proj_l is not None and corr_type == ConditionLineCorrType.START:
             lane_change_direction = (
                 LaneChangeDirection.LANE_CHANGE_TO_RIGHT
                 if proj_l > 0
