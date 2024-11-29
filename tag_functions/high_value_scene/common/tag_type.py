@@ -181,6 +181,13 @@ class JunctionPATHTag:
     first_arrive_junction_id: int = 0
     label_junction_id: int = 0
 
+    has_waiting_area: bool = False
+
+    # List[Tuple[waiting_lane_id, pose_s, pose_l, waiting_lane_length]]
+    waiting_area_lane_info: List[Tuple[int, float, float, float]] = field(
+        default_factory=list
+    )
+
     def as_dict(self):
         return {
             "turn_type": self.turn_type.name,
@@ -210,6 +217,9 @@ class JunctionPATHTag:
             "has_junction_label": self.has_junction_label,
             "first_arrive_junction_id": self.first_arrive_junction_id,
             "label_junction_id": self.label_junction_id,
+            #
+            "has_waiting_area": self.has_waiting_area,
+            "waiting_area_lane_info": self.waiting_area_lane_info,
         }
 
 
