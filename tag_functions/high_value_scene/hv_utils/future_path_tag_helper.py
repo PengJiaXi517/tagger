@@ -196,6 +196,7 @@ class FuturePathTagHelper:
         for in_junction_id in ego_path_info.in_junction_id:
             if in_junction_id is not None:
                 junction_path_tag.first_arrive_junction_id = in_junction_id
+                break
         junction_path_tag.label_junction_id = junction_label_info.junction_id
 
         path_distance_to_exit_lane = -1
