@@ -52,6 +52,17 @@ class FuturePathCollisionChecker:
                 1
             ] = collision_res.right_curb_index
 
+    def update_future_path_nearest_curb_dist(
+        self,
+        future_path_nearest_curb_dist: List[List[float]],
+        collision_res: CollisionResult,
+        idx: int,
+    ) -> None:
+        if len(future_path_nearest_curb_dist) <= idx:
+            future_path_nearest_curb_dist.append(
+                [collision_res.left_curb_dist, collision_res.right_curb_dist]
+            )
+
     def check_future_path_distance_to_curb_and_static_obs(
         self,
         params: Dict,
@@ -65,6 +76,7 @@ class FuturePathCollisionChecker:
         future_narrow_road_states = []
         future_narrow_road_states_loose_threshold = []
         future_path_nearby_curb_indexes = []
+        future_path_nearest_curb_dist = []
 
         collision_detector = CollisionDetector(
             params["big_car_area"],
@@ -81,6 +93,9 @@ class FuturePathCollisionChecker:
             )
             collision_res = collision_detector.check_distance_to_curb(
                 veh_polygon, curbs_linestring_map, curbs_interactive_lat_type
+            )
+            self.update_future_path_nearest_curb_dist(
+                future_path_nearest_curb_dist, collision_res, idx
             )
             self.update_future_narrow_road_states(
                 future_narrow_road_states,
@@ -111,6 +126,7 @@ class FuturePathCollisionChecker:
             future_narrow_road_states,
             future_narrow_road_states_loose_threshold,
             future_path_nearby_curb_indexes,
+            future_path_nearest_curb_dist,
         )
 
     def check_distance_to_moving_obs_for_future_states(

@@ -1,5 +1,6 @@
 from typing import Dict, List
 from shapely.geometry import Polygon
+import numpy as np
 
 
 class CollisionResult:
@@ -10,6 +11,8 @@ class CollisionResult:
         self.has_obs_right_loose: bool = False
         self.left_curb_index: int = None
         self.right_curb_index: int = None
+        self.left_curb_dist: float = np.inf
+        self.right_curb_dist: float = np.inf
 
 
 class CollisionDetector:
@@ -47,11 +50,15 @@ class CollisionDetector:
                 continue
 
             dist = curb_string.distance(veh_polygon)
-            if self.fill_static_collision_res(
-                dist, lat_decision, collision_res, idx
-            ):
-                break
 
+            if lat_decision == 1 and dist < collision_res.right_curb_dist:
+                collision_res.right_curb_dist = dist
+            elif lat_decision == 2 and dist < collision_res.left_curb_dist:
+                collision_res.left_curb_dist = dist
+
+            self.fill_static_collision_res(
+                dist, lat_decision, collision_res, idx
+            )
         return collision_res
 
     def check_distance_to_static_obs(

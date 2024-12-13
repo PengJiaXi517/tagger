@@ -42,7 +42,7 @@ def label_high_value_tag(data: TagData, params: Dict) -> Dict:
 
     # 判断路口内绕curb或静态障碍物
     high_value_tag.bypass_junction_curb_tag = label_bypass_junction_curb_tag(
-        basic_info
+        data, basic_info
     )
 
     # 判断未来8s内是否与动目标距离较近
