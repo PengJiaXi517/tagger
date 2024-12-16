@@ -124,7 +124,7 @@ class BypassJunctionCurbTagHelper:
                     is_right=0,
                     dist_to_exit_up=12,
                     dist_to_exit_low=5,
-                    dist_to_curb_thr=2.2,
+                    dist_to_curb_thr=3.0,
                 ):
                     return True
         elif junction_goal == "TYPE_TURN_RIGHT":

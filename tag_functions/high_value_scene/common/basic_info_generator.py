@@ -100,13 +100,8 @@ class BasicInfoGenerartor:
         )
 
         # 过滤l绝对值大的curb，并计算curbs的linestring
-        curb_filter = ObstacleFilter(
-            filter_obs_max_l=3.5,
-            front_vehicle_rel_x=10.0,
-            front_vehicle_rel_y=0.5,
-        )
         self.basic_info.curbs_linestring_map = (
-            curb_filter.build_curbs_linestring(curb_decision)
+            self.obstacle_filter.build_curbs_linestring(curb_decision)
         )
 
         # 筛选出静态障碍物，并计算其polygon
