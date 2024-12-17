@@ -124,7 +124,7 @@ class BypassJunctionCurbTagHelper:
                     is_right=0,
                     dist_to_exit_up=12,
                     dist_to_exit_low=5,
-                    dist_to_curb_thr=3.0,
+                    dist_to_curb_thr=2.2,
                 ):
                     return True
         elif junction_goal == "TYPE_TURN_RIGHT":
@@ -231,12 +231,23 @@ class BypassJunctionCurbTagHelper:
             exit_lane_polyline = LineString(
                 lane_map[arrive_exit_lane_id]["polyline"]
             )
+
             for idx in after_in_junction_idx:
                 point = Point(ego_path_linestring.coords[idx])
                 proj_s = exit_lane_polyline.project(point)
                 if proj_s <= 0 or proj_s >= exit_lane_polyline.length:
                     continue
-                pose_ls.append(exit_lane_polyline.distance(point))
+
+                dist_to_exit_lane_polyline = exit_lane_polyline.distance(point)
+                pose_ls.append(dist_to_exit_lane_polyline)
+
+                if (
+                    "percep_lane_exit_pose_l"
+                    not in corrected_junction_path_info
+                ):
+                    corrected_junction_path_info[
+                        "percep_lane_exit_pose_l"
+                    ] = dist_to_exit_lane_polyline
 
             corrected_junction_path_info["hit_point_num"] = len(pose_ls)
             if len(pose_ls) > 0:
@@ -330,28 +341,22 @@ def label_bypass_junction_curb_tag(
             basic_info,
         ):
             # 记录修正后的出口condition以及相关path信息
-            for exit_lane_info in junction_label_info.exit_lanes:
-                if exit_lane_info["lane_id"] == arrive_exit_lane_id:
-                    bypass_junction_curb_tag.is_interact_with_leftmost_or_rightmost_curb = (
-                        True
-                    )
-                    bypass_junction_curb_tag.corrected_exit_lane_id = (
-                        arrive_exit_lane_id
-                    )
-                    bypass_junction_curb_tag.arrive_dist_from_junction_exit = (
-                        arrive_dist_from_junction_exit
-                    )
-                    bypass_junction_curb_tag.corrected_exit_percep_pose_l = (
-                        float(exit_lane_info["pose_l"])
-                    )
-                    bypass_junction_curb_tag.corrected_junction_path_info = bypass_junction_curb_tag_helper.calculate_corrected_junction_path_info(
-                        corr_lane_ids_after_junction,
-                        after_in_junction_idx,
-                        lane_map,
-                        arrive_exit_lane_id,
-                        ego_path_linestring,
-                    )
-                    break
+            bypass_junction_curb_tag.is_interact_with_leftmost_or_rightmost_curb = (
+                True
+            )
+            bypass_junction_curb_tag.corrected_exit_lane_id = (
+                arrive_exit_lane_id
+            )
+            bypass_junction_curb_tag.arrive_dist_from_junction_exit = (
+                arrive_dist_from_junction_exit
+            )
+            bypass_junction_curb_tag.corrected_junction_path_info = bypass_junction_curb_tag_helper.calculate_corrected_junction_path_info(
+                corr_lane_ids_after_junction,
+                after_in_junction_idx,
+                lane_map,
+                arrive_exit_lane_id,
+                ego_path_linestring,
+            )
             break
 
     return bypass_junction_curb_tag

@@ -10,7 +10,6 @@ class BypassJunctionCurbTag:
         self.is_interact_with_leftmost_or_rightmost_curb: bool = False
         self.corrected_exit_lane_id: int = -1
         self.arrive_dist_from_junction_exit: float = 0.0
-        self.corrected_exit_percep_pose_l: float = 0.0
         self.corrected_junction_path_info: Dict = {}
 
     def as_dict(self):
@@ -19,7 +18,6 @@ class BypassJunctionCurbTag:
             "is_interact_with_leftmost_or_rightmost_curb": self.is_interact_with_leftmost_or_rightmost_curb,
             "label_exit_lane_id": self.corrected_exit_lane_id,
             "arrive_dist_from_junction_exit": self.arrive_dist_from_junction_exit,
-            "percep_lane_exit_pose_l": self.corrected_exit_percep_pose_l,
         }
         ret_dict.update(self.corrected_junction_path_info)
         return ret_dict
