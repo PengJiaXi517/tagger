@@ -224,6 +224,24 @@ class JunctionLabelInfo:
         self.waiting_area_lane_info[cur_entry_lane_id].append(waiting_lane_info)
 
 
+class LaneLightInfo:
+    def __init__(self, lane_light_info: Dict) -> None:
+        self.lane_light_id: int = lane_light_info['lane_light_id']
+        self.associated_lane_id: List[int] = lane_light_info['associated_lane_id']
+        self.navi_type: int = lane_light_info['navi_type']
+        self.color: int = lane_light_info['color']
+        self.green_flash_time_us: int = lane_light_info['green_flash_time_us']
+        self.green_flash_time_state: int = lane_light_info['green_flash_time_state']
+        self.yellow_time_us: int = lane_light_info['yellow_time_us']
+        self.yellow_time_state: int = lane_light_info['yellow_time_state']
+        
+
+class LaneLightsInfo:
+    def __init__(self, lane_lights_info: Dict, ts_us: int) -> None:
+        self.ts_us = ts_us
+        self.lane_lights_info: List[LaneLightInfo] = [LaneLightInfo(l) for l in lane_lights_info]
+
+
 class LabelScene:
     def __init__(
         self, label_path: os.PathLike, s3_client, max_valid_point_num: int = 34
@@ -252,6 +270,10 @@ class LabelScene:
             label["obstacles"][-9]["junction_info"],
             self.percepmap,
             self.ego_path_info,
+        )
+        self.lane_lights_info = LaneLightsInfo(
+            label["lane_lights_info"],
+            int(label_path.split('/')[-1].split('.')[0]),
         )
 
         from raw_data_preprocess.compose_pipelines import compose_pipelines

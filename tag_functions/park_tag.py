@@ -226,10 +226,12 @@ def check_front_car(obstacles) -> Union[int, None]:
             obs_info,
             np.array(
                 [
-                    obstacles[key]["decision"]["obs_s"],
-                    obstacles[key]["decision"]["obs_l"],
-                    key,
-                    obs_v,
+                    (
+                        obstacles[key]["decision"]["obs_s"],
+                        obstacles[key]["decision"]["obs_l"],
+                        key,
+                        obs_v
+                    )
                 ],
                 dtype=obs_info.dtype,
             ),

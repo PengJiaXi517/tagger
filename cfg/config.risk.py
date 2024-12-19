@@ -23,6 +23,7 @@ tag_pipelines = {
         "time_window_bef_stop": 3e6,
         "sample_point_length": 1.0,
     },
+    "abnormal_yield_tag": {},
 }
 
 max_valid_point_num = 100
