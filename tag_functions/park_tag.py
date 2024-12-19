@@ -97,7 +97,7 @@ def check_segs_intersect_aabox(ego_info: np.array, segs: np.array, aabox: Dict) 
     :param aabox: 2D-AABB {'min': (x_min, y_min), 'max': (x_max, y_max)}
     :return np.any(): True if intersect
     """
-    if segs.shape[0] < 1:
+    if segs.shape[0] < 2:
         return False
 
     # transform curb points to ego axis
