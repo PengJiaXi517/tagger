@@ -215,6 +215,7 @@ class BypassJunctionCurbTagHelper:
         after_in_junction_idx: List[int],
         lane_map: Dict,
         arrive_exit_lane_id: int,
+        arrive_dist_from_junction_exit: float,
         ego_path_linestring: LineString,
     ) -> Dict:
         bypass_junction_curb_tag = BypassJunctionCurbTag()
@@ -272,7 +273,11 @@ class BypassJunctionCurbTagHelper:
                         dist_to_exit_lane_polyline
                     )
 
+            if len(pose_ls) > arrive_dist_from_junction_exit:
+                pose_ls = pose_ls[arrive_dist_from_junction_exit:]
+            
             bypass_junction_curb_tag.hit_point_num = len(pose_ls)
+            
             if len(pose_ls) > 0:
                 bypass_junction_curb_tag.min_pose_l_2_exit_lane = np.min(
                     pose_ls
@@ -393,6 +398,7 @@ def label_bypass_junction_curb_tag(
                 after_in_junction_idx,
                 lane_map,
                 arrive_exit_lane_id,
+                arrive_dist_from_junction_exit,
                 ego_path_linestring,
             )
             # 记录修正后的出口condition以及相关path信息
