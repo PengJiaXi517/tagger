@@ -238,6 +238,10 @@ class FuturePathTagHelper:
             for corr_lane_ids in ego_path_info.corr_lane_id:
                 if corr_lane_ids is None:
                     break
+
+                if len(corr_lane_ids) == 0:
+                    continue
+                
                 final_entry_corr_lane_ids = corr_lane_ids
 
             if final_entry_corr_lane_ids is not None:
@@ -432,18 +436,22 @@ class FuturePathTagHelper:
             for corr_lane_ids, in_junction_id in zip(
                 ego_path_info.corr_lane_id, ego_path_info.in_junction_id
             ):
-                if corr_lane_ids is not None:
-                    if any(
-                        [
-                            lane_id in lane_seq
-                            for lane_id, pose_l in corr_lane_ids
-                        ]
-                    ):
-                        on_curr_lane_seq = True
-                    else:
-                        on_curr_lane_seq = False
-                else:
+                if corr_lane_ids is None:
                     break
+                    
+                if len(corr_lane_ids) == 0:
+                    continue
+
+                if any(
+                    [
+                        lane_id in lane_seq
+                        for lane_id, pose_l in corr_lane_ids
+                    ]
+                ):
+                    on_curr_lane_seq = True
+                else:
+                    on_curr_lane_seq = False
+
             if on_curr_lane_seq:
                 always_on_current_lane_seq.append(lane_seq)
 
@@ -453,18 +461,22 @@ class FuturePathTagHelper:
             for corr_lane_ids, in_junction_id in zip(
                 ego_path_info.corr_lane_id, ego_path_info.in_junction_id
             ):
-                if corr_lane_ids is not None:
-                    if any(
-                        [
-                            lane_id in lane_seq
-                            for lane_id, pose_l in corr_lane_ids
-                        ]
-                    ):
-                        on_curr_lane_seq = True
-                    else:
-                        on_curr_lane_seq = False
-                else:
+                if corr_lane_ids is None:
                     break
+
+                if len(corr_lane_ids) == 0:
+                    continue
+                
+                if any(
+                    [
+                        lane_id in lane_seq
+                        for lane_id, pose_l in corr_lane_ids
+                    ]
+                ):
+                    on_curr_lane_seq = True
+                else:
+                    on_curr_lane_seq = False
+
             if on_curr_lane_seq:
                 arrive_on_nearby_lane_seq.append(lane_seq)
 
