@@ -140,6 +140,7 @@ class BasicInfoGenerartor:
             self.basic_info.future_narrow_road_states,
             self.basic_info.future_narrow_road_states_loose_threshold,
             self.basic_info.future_path_nearby_curb_indexes,
+            self.basic_info.future_path_nearest_curb_dist,
         ) = self.future_path_collision_checker.check_future_path_distance_to_curb_and_static_obs(
             params,
             ego_path_info,

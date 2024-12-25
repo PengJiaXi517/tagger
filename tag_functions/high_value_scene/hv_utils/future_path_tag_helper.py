@@ -79,15 +79,21 @@ class FuturePathTagHelper:
             latest_on_percep_lane_point_idx = -1
             for i in range(num_points_on_lane):
                 point = Point(path_line_string.coords[i])
-                
-                l_dis = [pl.distance(point) for pl in polylines if 0 < pl.project(point) < pl.length]
-                
+
+                l_dis = [
+                    pl.distance(point)
+                    for pl in polylines
+                    if 0 < pl.project(point) < pl.length
+                ]
+
                 if len(l_dis) > 0:
                     curr_pose_l = np.min(l_dis)
 
                     latest_on_percep_lane_point_idx = i
                     pose_ls.append(curr_pose_l)
-            cruise_tag.latest_on_percep_lane_point_idx = latest_on_percep_lane_point_idx
+            cruise_tag.latest_on_percep_lane_point_idx = (
+                latest_on_percep_lane_point_idx
+            )
 
             if len(pose_ls) > 0:
                 cruise_tag.percep_pose_l = pose_ls[-1]
@@ -200,10 +206,20 @@ class FuturePathTagHelper:
         junction_path_tag.label_junction_id = junction_label_info.junction_id
 
         path_distance_to_exit_lane = -1
+        is_arrive_junction_entry = False
         for i, in_junction_id in enumerate(ego_path_info.in_junction_id):
-            if in_junction_id is not None and in_junction_id == junction_label_info.junction_id:
+            if (
+                in_junction_id is not None
+                and in_junction_id == junction_label_info.junction_id
+            ):
                 path_distance_to_exit_lane = i
-        junction_path_tag.path_distance_to_exit_lane = path_distance_to_exit_lane
+                if not is_arrive_junction_entry:
+                    is_arrive_junction_entry = True
+                    junction_path_tag.path_distance_to_entry = i - 1
+
+        junction_path_tag.path_distance_to_exit_lane = (
+            path_distance_to_exit_lane
+        )
 
         if len(junction_label_info.entry_lanes) > 0:
             junction_path_tag.has_entry_lane = True
@@ -222,6 +238,10 @@ class FuturePathTagHelper:
             for corr_lane_ids in ego_path_info.corr_lane_id:
                 if corr_lane_ids is None:
                     break
+
+                if len(corr_lane_ids) == 0:
+                    continue
+                
                 final_entry_corr_lane_ids = corr_lane_ids
 
             if final_entry_corr_lane_ids is not None:
@@ -241,6 +261,12 @@ class FuturePathTagHelper:
 
             if len(junction_path_tag.waiting_area_lane_info) > 0:
                 junction_path_tag.has_waiting_area = True
+
+            junction_path_tag.entry_dashline_length = (
+                self.get_dash_boundary_length(
+                    percep_map.lane_map[nearest_lane_id], True
+                )
+            )
 
         if len(junction_label_info.exit_lanes) > 0:
             junction_path_tag.has_exit_lane = True
@@ -329,6 +355,12 @@ class FuturePathTagHelper:
                     junction_path_tag.max_pose_l_2_exit_lane = np.max(pose_ls)
                     junction_path_tag.mean_pose_l_2_exit_lane = np.mean(pose_ls)
 
+            junction_path_tag.exit_dashline_length = (
+                self.get_dash_boundary_length(
+                    percep_map.lane_map[nearest_lane_id], False
+                )
+            )
+
         return junction_path_tag
 
     def label_backing_up_tag(self, data: TagData, params: Dict) -> bool:
@@ -408,18 +440,19 @@ class FuturePathTagHelper:
             for corr_lane_ids, in_junction_id in zip(
                 ego_path_info.corr_lane_id, ego_path_info.in_junction_id
             ):
-                if corr_lane_ids is not None:
-                    if any(
-                        [
-                            lane_id in lane_seq
-                            for lane_id, pose_l in corr_lane_ids
-                        ]
-                    ):
-                        on_curr_lane_seq = True
-                    else:
-                        on_curr_lane_seq = False
-                else:
+                if corr_lane_ids is None:
                     break
+                    
+                if len(corr_lane_ids) == 0:
+                    continue
+
+                if any(
+                    [lane_id in lane_seq for lane_id, pose_l in corr_lane_ids]
+                ):
+                    on_curr_lane_seq = True
+                else:
+                    on_curr_lane_seq = False
+
             if on_curr_lane_seq:
                 always_on_current_lane_seq.append(lane_seq)
 
@@ -429,18 +462,19 @@ class FuturePathTagHelper:
             for corr_lane_ids, in_junction_id in zip(
                 ego_path_info.corr_lane_id, ego_path_info.in_junction_id
             ):
-                if corr_lane_ids is not None:
-                    if any(
-                        [
-                            lane_id in lane_seq
-                            for lane_id, pose_l in corr_lane_ids
-                        ]
-                    ):
-                        on_curr_lane_seq = True
-                    else:
-                        on_curr_lane_seq = False
-                else:
+                if corr_lane_ids is None:
                     break
+
+                if len(corr_lane_ids) == 0:
+                    continue
+                
+                if any(
+                    [lane_id in lane_seq for lane_id, pose_l in corr_lane_ids]
+                ):
+                    on_curr_lane_seq = True
+                else:
+                    on_curr_lane_seq = False
+
             if on_curr_lane_seq:
                 arrive_on_nearby_lane_seq.append(lane_seq)
 
@@ -487,3 +521,32 @@ class FuturePathTagHelper:
                 always_on_current_lane_seq,
                 arrive_on_nearby_lane_seq,
             )
+
+    def get_dash_boundary_length(
+        self, lane: Dict, is_entry_lane: bool
+    ) -> List[float]:
+        left_boundary_type = (
+            lane["left_boundary"]["boundary_type"][::-1]
+            if is_entry_lane
+            else lane["left_boundary"]["boundary_type"]
+        )
+        right_boundary_type = (
+            lane["right_boundary"]["boundary_type"][::-1]
+            if is_entry_lane
+            else lane["right_boundary"]["boundary_type"]
+        )
+
+        left_dash_length = 0
+        right_dash_length = 0
+
+        for left_type in left_boundary_type:
+            if left_type[1][0] == "SOLID":
+                break
+            left_dash_length = abs(left_type[0] - left_boundary_type[0][0])
+
+        for right_type in right_boundary_type:
+            if right_type[1][0] == "SOLID":
+                break
+            right_dash_length = abs(right_type[0] - right_boundary_type[0][0])
+
+        return [left_dash_length, right_dash_length]

@@ -10,6 +10,7 @@ class BasicInfo:
         self.future_narrow_road_states: List[List[bool]] = None
         self.future_narrow_road_states_loose_threshold: List[List[bool]] = None
         self.future_path_nearby_curb_indexes: List[List[int]] = None
+        self.future_path_nearest_curb_dist: List[List[float]] = None
         self.future_bypass_junction_curb: List[bool] = None
         self.future_interaction_with_moving_obs: List[List[bool]] = None
 

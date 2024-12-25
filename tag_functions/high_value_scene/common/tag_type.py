@@ -7,10 +7,35 @@ from enum import Enum
 class BypassJunctionCurbTag:
     def __init__(self) -> None:
         self.is_bypass_junction_curb: bool = False
+        self.is_interact_with_leftmost_or_rightmost_curb: bool = False
+        self.corrected_exit_lane_id: int = -1
+        self.arrive_dist_from_junction_exit: float = 0.0
+        self.real_lane_exit_pose_l: float = 0.0
+        self.has_real_arrive_exit_lane = False
+        self.max_length_in_exit_lane: float = 0.0
+        self.max_length_not_in_exit_lane: float = 0.0
+        self.percep_lane_exit_pose_l:float = 0.0
+        self.hit_point_num: int = 0
+        self.min_pose_l_2_exit_lane: float = 0.0
+        self.max_pose_l_2_exit_lane: float = 0.0
+        self.mean_pose_l_2_exit_lane: float = 0.0
+
 
     def as_dict(self):
         return {
             "is_bypass_junction_curb": self.is_bypass_junction_curb,
+            "is_interact_with_leftmost_or_rightmost_curb": self.is_interact_with_leftmost_or_rightmost_curb,
+            "label_exit_lane_id": self.corrected_exit_lane_id,
+            "arrive_dist_from_junction_exit": self.arrive_dist_from_junction_exit,
+            "real_lane_exit_pose_l": self.real_lane_exit_pose_l,
+            "has_real_arrive_exit_lane": self.has_real_arrive_exit_lane,
+            "max_length_in_exit_lane": self.max_length_in_exit_lane,
+            "max_length_not_in_exit_lane": self.max_length_not_in_exit_lane,
+            "percep_lane_exit_pose_l": self.percep_lane_exit_pose_l,
+            "hit_point_num": self.hit_point_num,
+            "min_pose_l_2_exit_lane": self.min_pose_l_2_exit_lane,
+            "max_pose_l_2_exit_lane": self.max_pose_l_2_exit_lane,
+            "mean_pose_l_2_exit_lane": self.mean_pose_l_2_exit_lane,
         }
 
 
@@ -177,6 +202,7 @@ class JunctionPATHTag:
     max_length_not_in_exit_lane: float = 0.0
 
     path_distance_to_exit_lane: int = -1
+    path_distance_to_entry: int = -1
 
     hit_point_num: int = 0
     min_pose_l_2_exit_lane: float = 0.0
@@ -188,6 +214,12 @@ class JunctionPATHTag:
     label_junction_id: int = 0
 
     has_waiting_area: bool = False
+
+    # List[entry_left_dashline_length, entry_right_dashline_length]
+    entry_dashline_length: List[float] = None
+
+    # List[exit_left_dashline_length, exit_right_dashline_length]
+    exit_dashline_length: List[float] = None
 
     # List[Tuple[waiting_lane_id, pose_s, pose_l, waiting_lane_length]]
     waiting_area_lane_info: List[Tuple[int, float, float, float]] = field(
@@ -214,6 +246,7 @@ class JunctionPATHTag:
             "max_length_not_in_exit_lane": self.max_length_not_in_exit_lane,
             #
             "path_distance_to_exit_lane": self.path_distance_to_exit_lane,
+            "path_distance_to_entry": self.path_distance_to_entry,
             #
             "hit_point_num": self.hit_point_num,
             "min_pose_l_2_exit_lane": self.min_pose_l_2_exit_lane,
@@ -226,6 +259,8 @@ class JunctionPATHTag:
             #
             "has_waiting_area": self.has_waiting_area,
             "waiting_area_lane_info": self.waiting_area_lane_info,
+            "entry_dashline_length": self.entry_dashline_length,
+            "exit_dashline_length": self.exit_dashline_length,
         }
 
 
