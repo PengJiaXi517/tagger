@@ -97,6 +97,8 @@ def check_segs_intersect_aabox(ego_info: np.array, segs: np.array, aabox: Dict) 
     :param aabox: 2D-AABB {'min': (x_min, y_min), 'max': (x_max, y_max)}
     :return np.any(): True if intersect
     """
+    if segs.shape[0] < 2:
+        return False
 
     # transform curb points to ego axis
     points = segs.reshape(-1, 2)
@@ -224,10 +226,12 @@ def check_front_car(obstacles) -> Union[int, None]:
             obs_info,
             np.array(
                 [
-                    obstacles[key]["decision"]["obs_s"],
-                    obstacles[key]["decision"]["obs_l"],
-                    key,
-                    obs_v,
+                    (
+                        obstacles[key]["decision"]["obs_s"],
+                        obstacles[key]["decision"]["obs_l"],
+                        key,
+                        obs_v
+                    )
                 ],
                 dtype=obs_info.dtype,
             ),

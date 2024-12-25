@@ -26,6 +26,7 @@ from tag_functions.path_risk import path_risk
 from tag_functions.high_value_tag import label_high_value_tag
 from tag_functions.park_tag import park_check
 from tag_functions.wait_traffic_light_tag import traffic_start_slow_check
+from tag_functions.abnormal_yield_tag import abnormal_yield_tag
 from utils.config import Config
 
 

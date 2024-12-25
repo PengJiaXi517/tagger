@@ -159,8 +159,8 @@ class JunctionLabelInfo:
                     cur_entry_lane,
                     entry_lane_id,
                     entry_lane_id,
-                    entry_lane["pose_s"],
-                    entry_lane["pose_l"],
+                    float(entry_lane["pose_s"]),
+                    float(entry_lane["pose_l"]),
                 )
 
             if len(cur_entry_lane["successor_id"]) == 0:
@@ -199,27 +199,47 @@ class JunctionLabelInfo:
                     break
                 if corr_lane_info[0][0] == waiting_lane_id:
                     waiting_lane_corr_final_future_point_idx = idx
-                    pose_l = corr_lane_info[0][1]
+                    pose_l = float(corr_lane_info[0][1])
 
             if waiting_lane_corr_final_future_point_idx != -1:
-                pose_s = waiting_lane_linestring.project(
-                    Point(
-                        ego_path_info.future_path[
-                            waiting_lane_corr_final_future_point_idx
-                        ]
+                pose_s = float(
+                    waiting_lane_linestring.project(
+                        Point(
+                            ego_path_info.future_path[
+                                waiting_lane_corr_final_future_point_idx
+                            ]
+                        )
                     )
                 )
 
         waiting_lane_info = (
             waiting_lane_id,
             pose_s,
-            pose_l.item() if pose_l is not None else None,
+            pose_l,
             waiting_lane_linestring.length,
         )
 
         if cur_entry_lane_id not in self.waiting_area_lane_info:
             self.waiting_area_lane_info[cur_entry_lane_id] = []
         self.waiting_area_lane_info[cur_entry_lane_id].append(waiting_lane_info)
+
+
+class LaneLightInfo:
+    def __init__(self, lane_light_info: Dict) -> None:
+        self.lane_light_id: int = lane_light_info['lane_light_id']
+        self.associated_lane_id: List[int] = lane_light_info['associated_lane_id']
+        self.navi_type: int = lane_light_info['navi_type']
+        self.color: int = lane_light_info['color']
+        self.green_flash_time_us: int = lane_light_info['green_flash_time_us']
+        self.green_flash_time_state: int = lane_light_info['green_flash_time_state']
+        self.yellow_time_us: int = lane_light_info['yellow_time_us']
+        self.yellow_time_state: int = lane_light_info['yellow_time_state']
+        
+
+class LaneLightsInfo:
+    def __init__(self, lane_lights_info: Dict, ts_us: int) -> None:
+        self.ts_us = ts_us
+        self.lane_lights_info: List[LaneLightInfo] = [LaneLightInfo(l) for l in lane_lights_info]
 
 
 class LabelScene:
@@ -250,6 +270,10 @@ class LabelScene:
             label["obstacles"][-9]["junction_info"],
             self.percepmap,
             self.ego_path_info,
+        )
+        self.lane_lights_info = LaneLightsInfo(
+            label["lane_lights_info"],
+            int(label_path.split('/')[-1].split('.')[0]),
         )
 
         from raw_data_preprocess.compose_pipelines import compose_pipelines
