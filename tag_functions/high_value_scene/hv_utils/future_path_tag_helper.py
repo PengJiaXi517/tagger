@@ -263,7 +263,9 @@ class FuturePathTagHelper:
                 junction_path_tag.has_waiting_area = True
 
             junction_path_tag.entry_dashline_length = (
-                self.get_dash_boundary_length(percep_map, nearest_lane_id)
+                self.get_dash_boundary_length(
+                    percep_map.lane_map[nearest_lane_id], True
+                )
             )
 
         if len(junction_label_info.exit_lanes) > 0:
@@ -354,7 +356,9 @@ class FuturePathTagHelper:
                     junction_path_tag.mean_pose_l_2_exit_lane = np.mean(pose_ls)
 
             junction_path_tag.exit_dashline_length = (
-                self.get_dash_boundary_length(percep_map, nearest_lane_id)
+                self.get_dash_boundary_length(
+                    percep_map.lane_map[nearest_lane_id], False
+                )
             )
 
         return junction_path_tag
@@ -443,10 +447,7 @@ class FuturePathTagHelper:
                     continue
 
                 if any(
-                    [
-                        lane_id in lane_seq
-                        for lane_id, pose_l in corr_lane_ids
-                    ]
+                    [lane_id in lane_seq for lane_id, pose_l in corr_lane_ids]
                 ):
                     on_curr_lane_seq = True
                 else:
@@ -468,10 +469,7 @@ class FuturePathTagHelper:
                     continue
                 
                 if any(
-                    [
-                        lane_id in lane_seq
-                        for lane_id, pose_l in corr_lane_ids
-                    ]
+                    [lane_id in lane_seq for lane_id, pose_l in corr_lane_ids]
                 ):
                     on_curr_lane_seq = True
                 else:
@@ -525,25 +523,30 @@ class FuturePathTagHelper:
             )
 
     def get_dash_boundary_length(
-        self, percep_map: PercepMap, nearest_lane_id: int
+        self, lane: Dict, is_entry_lane: bool
     ) -> List[float]:
-        left_boundary_type = percep_map.lane_map[nearest_lane_id][
-            "left_boundary"
-        ]["boundary_type"]
-        right_boundary_type = percep_map.lane_map[nearest_lane_id][
-            "right_boundary"
-        ]["boundary_type"]
-        entry_left_dash_length = 0
-        entry_right_dash_length = 0
+        left_boundary_type = (
+            lane["left_boundary"]["boundary_type"][::-1]
+            if is_entry_lane
+            else lane["left_boundary"]["boundary_type"]
+        )
+        right_boundary_type = (
+            lane["right_boundary"]["boundary_type"][::-1]
+            if is_entry_lane
+            else lane["right_boundary"]["boundary_type"]
+        )
+
+        left_dash_length = 0
+        right_dash_length = 0
 
         for left_type in left_boundary_type:
             if left_type[1][0] == "SOLID":
                 break
-            entry_left_dash_length = left_type[0]
+            left_dash_length = abs(left_type[0] - left_boundary_type[0][0])
 
         for right_type in right_boundary_type:
             if right_type[1][0] == "SOLID":
                 break
-            entry_right_dash_length = left_type[0]
+            right_dash_length = abs(right_type[0] - right_boundary_type[0][0])
 
-        return [entry_left_dash_length, entry_right_dash_length]
+        return [left_dash_length, right_dash_length]
