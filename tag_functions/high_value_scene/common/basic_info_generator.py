@@ -58,6 +58,11 @@ class BasicInfoGenerartor:
             is_ego_vehicle_always_moving(obstacles[-9])
         )
 
+        ego_history_states = obstacles[-9]["features"]["history_states"]
+        self.basic_info.cur_ego_vel = np.linalg.norm(
+            [ego_history_states[-1]["vx"], ego_history_states[-1]["vy"]]
+        )
+
     def calculate_future_path_basic_info(self, data: TagData) -> None:
         ego_path_info = data.label_scene.ego_path_info
 
@@ -98,6 +103,7 @@ class BasicInfoGenerartor:
         curb_decision = data.label_scene.label_res["curb_label"].get(
             "decision", None
         )
+        future_path_linestring = data.label_scene.ego_path_info.future_path_linestring
 
         # 过滤l绝对值大的curb，并计算curbs的linestring
         self.basic_info.curbs_linestring_map = (
@@ -108,7 +114,7 @@ class BasicInfoGenerartor:
         (
             self.basic_info.static_obstacles_map,
             self.basic_info.static_obstacles_polygons_map,
-        ) = self.obstacle_filter.build_static_obstacle_polygons(obstacles)
+        ) = self.obstacle_filter.build_static_obstacle_polygons(obstacles, future_path_linestring)
 
         # 筛选出动态障碍物
         self.basic_info.moving_obstacles_map = (
@@ -141,6 +147,7 @@ class BasicInfoGenerartor:
             self.basic_info.future_narrow_road_states_loose_threshold,
             self.basic_info.future_path_nearby_curb_indexes,
             self.basic_info.future_path_nearest_curb_dist,
+            self.basic_info.future_path_nearest_static_obs_dist,
         ) = self.future_path_collision_checker.check_future_path_distance_to_curb_and_static_obs(
             params,
             ego_path_info,
@@ -159,7 +166,10 @@ class BasicInfoGenerartor:
             self.basic_info.future_narrow_road_states_loose_threshold,
         )
 
-        self.basic_info.future_interaction_with_moving_obs = self.future_path_collision_checker.check_distance_to_moving_obs_for_future_states(
+        (
+            self.basic_info.future_interaction_with_moving_obs,
+            self.basic_info.future_path_nearest_moving_obs_dist,
+        ) = self.future_path_collision_checker.check_distance_to_moving_obs_for_future_states(
             params,
             obstacles[-9],
             self.basic_info.moving_obstacles_map,
@@ -247,5 +257,5 @@ class BasicInfoGenerartor:
     def calculate_lane_change_basic_info(self) -> None:
         self.basic_info.lane_change_direction = judge_lane_change_direction(
             self.basic_info.future_path_points_sl_coordinate_projected_to_condition,
-            self.basic_info.future_path_points_sl_coordinate_projected_to_condition_corr_type
+            self.basic_info.future_path_points_sl_coordinate_projected_to_condition_corr_type,
         )

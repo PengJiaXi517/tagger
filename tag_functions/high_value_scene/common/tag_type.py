@@ -14,12 +14,11 @@ class BypassJunctionCurbTag:
         self.has_real_arrive_exit_lane = False
         self.max_length_in_exit_lane: float = 0.0
         self.max_length_not_in_exit_lane: float = 0.0
-        self.percep_lane_exit_pose_l:float = 0.0
+        self.percep_lane_exit_pose_l: float = 0.0
         self.hit_point_num: int = 0
         self.min_pose_l_2_exit_lane: float = 0.0
         self.max_pose_l_2_exit_lane: float = 0.0
         self.mean_pose_l_2_exit_lane: float = 0.0
-
 
     def as_dict(self):
         return {
@@ -47,6 +46,35 @@ class LaneCentralAdsorbTag:
     def as_dict(self):
         return {
             "adsorbed_path": self.adsorbed_path,
+        }
+
+
+@dataclass(repr=False)
+class BypassObstaclesTag:
+    def __init__(self) -> None:
+        self.is_bypass_obstacles_in_road: bool = False
+        self.is_bypass_obstacles_in_junction: bool = False
+        self.first_bypass_obs_in_road_ind: int = -1
+        self.first_bypass_obs_in_junction_ind: int = -1
+        self.max_curvature_change_rate: float = 0.0
+        # self.future_path_curvature: List[float] = []
+        # self.future_path_nearest_curb_dist: List[List[float]] = []
+        # self.future_path_nearest_static_obs_dist: List[List[float]] = []
+        # self.future_path_nearest_moving_obs_dist: List[List[float]] = []
+        # self.distance_to_condition: List[float] = []
+
+    def as_dict(self):
+        return {
+            "is_bypass_obstacles_in_road": self.is_bypass_obstacles_in_road,
+            "is_bypass_obstacles_in_junction": self.is_bypass_obstacles_in_junction,
+            "first_bypass_obs_in_road_ind": self.first_bypass_obs_in_road_ind,
+            "first_bypass_obs_in_junction_ind": self.first_bypass_obs_in_junction_ind,
+            "max_curvature_change_rate": self.max_curvature_change_rate,
+            # "future_path_curvature": self.future_path_curvature,
+            # "future_path_nearest_curb_dist": self.future_path_nearest_curb_dist,
+            # "future_path_nearest_static_obs_dist": self.future_path_nearest_static_obs_dist,
+            # "future_path_nearest_moving_obs_dist": self.future_path_nearest_moving_obs_dist,
+            # "distance_to_condition": self.distance_to_condition,
         }
 
 
@@ -154,10 +182,12 @@ class LcPATHTag:
             "labeled_lane_seq": self.labeled_lane_seq,
         }
 
+
 class ConditionLineCorrType(Enum):
     NONE = 0
     START = 1
     END = 2
+
 
 class LaneChangeDirection(Enum):
     UNKNOWN = -1
@@ -369,6 +399,7 @@ class HighValueTag:
     interact_with_moving_obs_tag: InteractWithMovingObsTag = None
     ramp_tag: RampTag = None
     future_path_tag: FuturePathTag = field(default_factory=FuturePathTag)
+    bypass_obstacles_tag: BypassObstaclesTag = None
     lane_central_adsorb_tag: LaneCentralAdsorbTag = None
     quick_lane_change_tag: QuickLaneChangeTag = None
     right_turn_only_tag: RightTurnOnlyTag = None
@@ -390,6 +421,9 @@ class HighValueTag:
             else None,
             "ramp_tag": self.ramp_tag.as_dict()
             if self.ramp_tag is not None
+            else None,
+            "bypass_obstacles_tag": self.bypass_obstacles_tag.as_dict()
+            if self.bypass_obstacles_tag is not None
             else None,
             "lane_central_adsorb_tag": self.lane_central_adsorb_tag.as_dict()
             if self.lane_central_adsorb_tag is not None

@@ -13,6 +13,10 @@ class CollisionResult:
         self.right_curb_index: int = None
         self.left_curb_dist: float = np.inf
         self.right_curb_dist: float = np.inf
+        self.left_static_obs_dist: float = np.inf
+        self.right_static_obs_dist: float = np.inf
+        self.left_moving_obs_dist: float = np.inf
+        self.right_moving_obs_dist: float = np.inf
 
 
 class CollisionDetector:
@@ -83,10 +87,15 @@ class CollisionDetector:
             obs_polygon = static_obstacles_polygons_map[k]
             dist = veh_polygon.distance(obs_polygon)
 
-            if self.fill_static_collision_res(
+            if lat_decision == 1 and dist < collision_res.right_static_obs_dist:
+                collision_res.right_static_obs_dist = dist
+            elif lat_decision == 2 and dist < collision_res.left_static_obs_dist:
+                collision_res.left_static_obs_dist = dist
+
+            self.fill_static_collision_res(
                 dist, lat_decision, collision_res
-            ):
-                break
+            )
+                # break
 
         return collision_res
 
@@ -124,17 +133,24 @@ class CollisionDetector:
             ):
                 dist_th = self.near_caution_obs_dist_th
 
-            if veh_polygon.distance(obs_polygon) < dist_th:
+            dist = veh_polygon.distance(obs_polygon)
+            
+            if lat_decision == 1 and dist < collision_res.right_moving_obs_dist:
+                collision_res.right_moving_obs_dist = dist
+            elif lat_decision == 2 and dist < collision_res.left_moving_obs_dist:
+                collision_res.left_moving_obs_dist = dist
+
+            if dist < dist_th:
                 if lat_decision == 1:
                     collision_res.has_obs_right_strict = True
                 elif lat_decision == 2:
                     collision_res.has_obs_left_strict = True
 
-            if (
-                collision_res.has_obs_left_strict
-                and collision_res.has_obs_right_strict
-            ):
-                break
+            # if (
+            #     collision_res.has_obs_left_strict
+            #     and collision_res.has_obs_right_strict
+            # ):
+            #     break
 
         return collision_res
 

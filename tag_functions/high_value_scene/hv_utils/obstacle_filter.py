@@ -27,12 +27,20 @@ class ObstacleFilter:
             if abs(obs["decision"]["obs_l"]) > self.filter_obs_max_l:
                 continue
 
+            if (
+                obs["decision"]["obs_s"] - obs["decision"]["ego_s"] <= -2.5
+                or obs["decision"]["obs_s"] - obs["decision"]["ego_s"] > 100
+            ):
+                continue
+
             if not is_obstacle_always_static(obs):
                 moving_obstacles_map[id] = obs
 
         return moving_obstacles_map
 
-    def build_static_obstacle_polygons(self, obstacles: Dict) -> Dict:
+    def build_static_obstacle_polygons(
+        self, obstacles: Dict, future_path_linestring: LineString
+    ) -> Dict:
         static_obstacles_polygons_map = {}
         static_obstacles_map = {}
         for id, obs in obstacles.items():
@@ -40,6 +48,12 @@ class ObstacleFilter:
                 continue
 
             if abs(obs["decision"]["obs_l"]) > self.filter_obs_max_l:
+                continue
+
+            if (
+                obs["decision"]["obs_s"] - obs["decision"]["ego_s"] <= -2.5
+                or obs["decision"]["obs_s"] - obs["decision"]["ego_s"] > 100
+            ):
                 continue
 
             if is_obstacle_always_static(obs):
@@ -60,6 +74,9 @@ class ObstacleFilter:
                         obs_bbox[0],
                     ]
                 )
+                if future_path_linestring.intersects(obs_polygon):
+                    continue
+
                 static_obstacles_polygons_map[id] = obs_polygon
                 static_obstacles_map[id] = obs
 
