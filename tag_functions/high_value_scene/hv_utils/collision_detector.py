@@ -95,7 +95,6 @@ class CollisionDetector:
             self.fill_static_collision_res(
                 dist, lat_decision, collision_res
             )
-                # break
 
         return collision_res
 
@@ -145,12 +144,6 @@ class CollisionDetector:
                     collision_res.has_obs_right_strict = True
                 elif lat_decision == 2:
                     collision_res.has_obs_left_strict = True
-
-            # if (
-            #     collision_res.has_obs_left_strict
-            #     and collision_res.has_obs_right_strict
-            # ):
-            #     break
 
         return collision_res
 

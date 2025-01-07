@@ -104,9 +104,6 @@ class FuturePathCollisionChecker:
             collision_res = collision_detector.check_distance_to_curb(
                 veh_polygon, curbs_linestring_map, curbs_interactive_lat_type
             )
-            # self.update_future_path_nearest_collision_dist(
-            #     future_path_nearest_curb_dist, collision_res, idx
-            # )
             self.update_future_narrow_road_states(
                 future_narrow_road_states,
                 future_narrow_road_states_loose_threshold,
@@ -114,24 +111,18 @@ class FuturePathCollisionChecker:
                 collision_res,
                 idx,
             )
-
-            # if (
-            #     collision_res.has_obs_left_strict
-            #     and collision_res.has_obs_right_strict
-            # ):
-            #     continue
+            if len(future_path_nearest_curb_dist) <= idx:
+                future_path_nearest_curb_dist.append(
+                    [
+                        collision_res.left_curb_dist,
+                        collision_res.right_curb_dist,
+                    ]
+                )
 
             collision_res = collision_detector.check_distance_to_static_obs(
                 veh_polygon, static_obstacles_map, static_obstacles_polygons_map
             )
 
-            self.update_future_path_nearest_collision_dist(
-                future_path_nearest_curb_dist,
-                future_path_nearest_static_obs_dist,
-                collision_res,
-                idx,
-            )
-
             self.update_future_narrow_road_states(
                 future_narrow_road_states,
                 future_narrow_road_states_loose_threshold,
@@ -139,6 +130,14 @@ class FuturePathCollisionChecker:
                 collision_res,
                 idx,
             )
+
+            if len(future_path_nearest_static_obs_dist) <= idx:
+                future_path_nearest_static_obs_dist.append(
+                    [
+                        collision_res.left_static_obs_dist,
+                        collision_res.right_static_obs_dist,
+                    ]
+                )
 
         return (
             future_narrow_road_states,

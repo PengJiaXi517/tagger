@@ -27,7 +27,7 @@ class BasicInfo:
         self.future_path_curvature: np.ndarray = None
         self.future_path_turn_type: np.ndarray = None
         self.max_abs_path_curvature: float = 0.0
-        self.cur_ego_vel: float = 0.0
+        self.max_curvature_gradient: float = 0.0
         self.is_cross_junction: bool = False
         self.is_ego_vehicle_always_moving: bool = False
 

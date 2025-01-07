@@ -58,11 +58,6 @@ class BasicInfoGenerartor:
             is_ego_vehicle_always_moving(obstacles[-9])
         )
 
-        ego_history_states = obstacles[-9]["features"]["history_states"]
-        self.basic_info.cur_ego_vel = np.linalg.norm(
-            [ego_history_states[-1]["vx"], ego_history_states[-1]["vy"]]
-        )
-
     def calculate_future_path_basic_info(self, data: TagData) -> None:
         ego_path_info = data.label_scene.ego_path_info
 
@@ -98,12 +93,20 @@ class BasicInfoGenerartor:
             self.basic_info.future_path_curvature
         ).max()
 
+        # 计算曲率的梯度绝对值的最大值
+        curvature_gradient = np.gradient(self.basic_info.future_path_curvature)
+        self.basic_info.max_curvature_gradient = np.max(
+            np.abs(curvature_gradient)
+        )
+
     def calculate_obstacles_and_curbs_basic_info(self, data: TagData) -> None:
         obstacles = data.label_scene.obstacles
         curb_decision = data.label_scene.label_res["curb_label"].get(
             "decision", None
         )
-        future_path_linestring = data.label_scene.ego_path_info.future_path_linestring
+        future_path_linestring = (
+            data.label_scene.ego_path_info.future_path_linestring
+        )
 
         # 过滤l绝对值大的curb，并计算curbs的linestring
         self.basic_info.curbs_linestring_map = (
@@ -114,7 +117,9 @@ class BasicInfoGenerartor:
         (
             self.basic_info.static_obstacles_map,
             self.basic_info.static_obstacles_polygons_map,
-        ) = self.obstacle_filter.build_static_obstacle_polygons(obstacles, future_path_linestring)
+        ) = self.obstacle_filter.build_static_obstacle_polygons(
+            obstacles, future_path_linestring
+        )
 
         # 筛选出动态障碍物
         self.basic_info.moving_obstacles_map = (

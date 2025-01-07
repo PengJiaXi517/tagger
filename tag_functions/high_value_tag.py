@@ -11,8 +11,8 @@ from tag_functions.high_value_scene.interact_with_moving_obs import (
 )
 from tag_functions.high_value_scene.yield_vru_tag import label_yield_vru_tag
 from tag_functions.high_value_scene.ramp_tag import label_ramp_tag
-from tag_functions.high_value_scene.bypass_obstacles_tag import (
-    label_bypass_obstacles_tag,
+from tag_functions.high_value_scene.dead_car_bypass_tag import (
+    label_dead_car_bypass_tag,
 )
 from tag_functions.high_value_scene.lane_central_adsorb_tag import (
     label_lane_central_adsorb_tag,
@@ -53,7 +53,10 @@ def label_high_value_tag(data: TagData, params: Dict) -> Dict:
         label_interact_with_moving_obs_tag(basic_info)
     )
 
-    high_value_tag.bypass_obstacles_tag = label_bypass_obstacles_tag(data, basic_info)
+    # 判断是否绕行死车等障碍物
+    high_value_tag.dead_car_bypass_tag = label_dead_car_bypass_tag(
+        data, basic_info
+    )
 
     # 结合动静障碍物距离，输出向中心线吸附的future path
     high_value_tag.lane_central_adsorb_tag = label_lane_central_adsorb_tag(
