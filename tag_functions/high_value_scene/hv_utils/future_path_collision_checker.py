@@ -52,26 +52,6 @@ class FuturePathCollisionChecker:
                 1
             ] = collision_res.right_curb_index
 
-    def update_future_path_nearest_collision_dist(
-        self,
-        future_path_nearest_curb_dist: List[List[float]],
-        future_path_nearest_static_obs_dist: List[List[float]],
-        collision_res: CollisionResult,
-        idx: int,
-    ) -> None:
-        if len(future_path_nearest_curb_dist) <= idx:
-            future_path_nearest_curb_dist.append(
-                [collision_res.left_curb_dist, collision_res.right_curb_dist]
-            )
-
-        if len(future_path_nearest_static_obs_dist) <= idx:
-            future_path_nearest_static_obs_dist.append(
-                [
-                    collision_res.left_static_obs_dist,
-                    collision_res.right_static_obs_dist,
-                ]
-            )
-
     def check_future_path_distance_to_curb_and_static_obs(
         self,
         params: Dict,
