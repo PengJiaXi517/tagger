@@ -733,8 +733,8 @@ class StateFeatureSplitTypePacker(StateFeaturePacker):
         for obs_id in obstacles:
             feature = obstacles[obs_id]["features"]
             curr_state = feature["history_states"][-1]
-            curr_pos = np.array([curr_state["x"], curr_state["y"]])
-            curr_vel = np.array([curr_state["vx"], curr_state["vy"]])
+            curr_pos = np.array([curr_state["x"], curr_state["y"]], dtype=np.float64)
+            curr_vel = np.array([curr_state["vx"], curr_state["vy"]], dtype=np.float64)
             ids.append(obs_id)
             pos.append(curr_pos)
             vel.append(curr_vel)
@@ -758,7 +758,8 @@ class StateFeatureSplitTypePacker(StateFeaturePacker):
                     np.sin(ego_theta),
                     np.cos(ego_theta),
                 ],
-            ]
+            ],
+            dtype=np.float64,
         ).T
         t_vec = -np.array([ego_pos[0], ego_pos[1]]) @ rot_mat.T
 

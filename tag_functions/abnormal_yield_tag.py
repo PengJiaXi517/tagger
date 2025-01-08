@@ -14,6 +14,7 @@ class AbnormalYieldTag:
     is_still: bool = False
     ego_acc_1s: float = None
     ego_acc_2s: float = None
+    still_distance: float = None
     dis_to_stopline: int = 150
     nearest_front_car_distance: float = None
     nearest_front_car_vel: float = None
@@ -30,6 +31,7 @@ class AbnormalYieldTag:
                 "is_still": self.is_still,
                 "ego_acc_1s": self.ego_acc_1s,
                 "ego_acc_2s": self.ego_acc_2s,
+                "still_distance": self.still_distance,
                 "dis_to_stopline": self.dis_to_stopline,
                 "nearest_front_car_distance": self.nearest_front_car_distance,
                 "nearest_front_car_vel": self.nearest_front_car_vel,
@@ -43,7 +45,7 @@ class AbnormalYieldTag:
         }
 
 
-def get_nearest_front_car(obstacles) -> Union[int, None]:
+def get_nearest_front_car(obstacles, obs_in_range) -> Union[int, None]:
     """
     :param obstacles: data.label_scene.label_res["obstacles"]
     :return None if no front car else front car OBSID
@@ -64,6 +66,9 @@ def get_nearest_front_car(obstacles) -> Union[int, None]:
     # forall obs
     for key in obstacles:
         if key == -9:
+            continue
+
+        if key not in obs_in_range:
             continue
 
         # get obs_v
@@ -107,7 +112,7 @@ def get_nearest_front_car(obstacles) -> Union[int, None]:
         return None
 
 
-def get_nearest_cutin_cat(obstacles, ego_path_linestring: LineString):
+def get_nearest_cutin_cat(obstacles, ego_path_linestring: LineString, obs_in_range):
     ret = {
         "s": None,
         "w": None,
@@ -115,6 +120,9 @@ def get_nearest_cutin_cat(obstacles, ego_path_linestring: LineString):
 
     for obs_id, obs in obstacles.items():
         if obs_id == -9:
+            continue
+
+        if obs_id not in obs_in_range:
             continue
 
         obs_decision = obs["decision"]
@@ -125,7 +133,15 @@ def get_nearest_cutin_cat(obstacles, ego_path_linestring: LineString):
 
         obs_ttc = obs_decision["obs_ttc"]
 
-        if 0 < obs_ttc <= 50:
+        obs_v = np.sqrt(
+            obs["features"]["history_states"][-1]["vx"] ** 2
+            + obs["features"]["history_states"][-1]["vy"] ** 2
+        )
+
+        if obs_v < 0.5:
+            continue
+
+        if 0 < obs_ttc <= 30:
             future_states = obs["future_trajectory"]["future_states"]
 
             if obs_ttc > len(future_states):
@@ -261,12 +277,35 @@ def abnormal_yield_tag(data: TagData, params: Dict) -> Dict:
         ** 0.5
     )
 
+    future_states = data.label_scene.obstacles[-9]["future_trajectory"]["future_states"]
+
     # 1. cal is still
     if ego_vel < 0.5:
         abnormal_yield_tag.is_still = True
+        abnormal_yield_tag.still_distance = 0.0
+    else:
+        for i in range(min(len(future_states), 30)):
+            v = float(
+                ((future_states[i]["vx"] ** 2 + future_states[i]["vy"] ** 2) ** 0.5)
+            )
+            if v < 0.5:
+                abnormal_yield_tag.is_still = True
+                prev_x, prev_y = data.label_scene.obstacles[-9]["features"]["history_states"][-1]["x"], data.label_scene.obstacles[-9]["features"]["history_states"][-1]["y"]
+                
+                distance = 0.0
+                for j in range(i + 1):
+                    distance += (
+                        (future_states[j]['x'] - prev_x) ** 2 +
+                        (future_states[j]['y'] - prev_y) ** 2
+                    ) ** 0.5
+                    
+                    prev_x = future_states[j]['x']
+                    prev_y = future_states[j]['y']
+                
+                abnormal_yield_tag.still_distance = distance
+                break
 
     # 2. cal future acc
-    future_states = data.label_scene.obstacles[-9]["future_trajectory"]["future_states"]
     if len(future_states) >= 10:
         abnormal_yield_tag.ego_acc_1s = float(
             ((future_states[9]["vx"] ** 2 + future_states[9]["vy"] ** 2) ** 0.5)
@@ -297,8 +336,10 @@ def abnormal_yield_tag(data: TagData, params: Dict) -> Dict:
 
         abnormal_yield_tag.dis_to_stopline = distance_to_stop_line
 
+    obs_in_range = set(data.label_scene.label_res['obstacle_state']['id_map'].keys())
+
     # 4. cal nearest_front_car
-    nearest_obs_info = get_nearest_front_car(data.label_scene.obstacles)
+    nearest_obs_info = get_nearest_front_car(data.label_scene.obstacles, obs_in_range)
 
     if nearest_obs_info is not None:
         abnormal_yield_tag.nearest_front_car_distance = float(nearest_obs_info["s"])
@@ -307,7 +348,8 @@ def abnormal_yield_tag(data: TagData, params: Dict) -> Dict:
 
     # 5. cal nearest cutin in 5s
     nearest_cutin_obs_info = get_nearest_cutin_cat(
-        data.label_scene.obstacles, ego_path_info.future_path_linestring
+        data.label_scene.obstacles, ego_path_info.future_path_linestring,
+        obs_in_range
     )
 
     if nearest_cutin_obs_info is not None:
