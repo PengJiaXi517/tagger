@@ -74,12 +74,13 @@ class QuickLaneChangeTag:
         self.is_lane_change: bool = False
         self.is_quick_lane_change: bool = False
         self.lane_change_begin_index: int = -1
-
+        self.lane_change_await_time: float = 0.0
     def as_dict(self):
         return {
             "is_lane_change": self.is_lane_change,
             "is_quick_lane_change": self.is_quick_lane_change,
             "lane_change_begin_index": self.lane_change_begin_index,
+            "lane_change_await_time": self.lane_change_await_time,
         }
 
 

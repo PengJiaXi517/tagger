@@ -1,4 +1,4 @@
-from typing import Dict, List
+from typing import Dict, List, Set
 from shapely.geometry import LineString, Point, Polygon
 import numpy as np
 from tag_functions.high_value_scene.hv_utils.basic_func import (
@@ -18,19 +18,13 @@ class ObstacleFilter:
         self.front_vehicle_rel_x: float = front_vehicle_rel_x
         self.front_vehicle_rel_y: float = front_vehicle_rel_y
 
-    def find_moving_obstacles(self, obstacles: Dict) -> Dict:
+    def find_moving_obstacles(self, obstacles: Dict, obs_in_range: Set) -> Dict:
         moving_obstacles_map = {}
         for id, obs in obstacles.items():
-            if id == -9:
+            if id == -9 or (id not in obs_in_range):
                 continue
 
             if abs(obs["decision"]["obs_l"]) > self.filter_obs_max_l:
-                continue
-
-            if (
-                obs["decision"]["obs_s"] - obs["decision"]["ego_s"] <= -2.5
-                or obs["decision"]["obs_s"] - obs["decision"]["ego_s"] > 100
-            ):
                 continue
 
             if not is_obstacle_always_static(obs):
@@ -39,12 +33,15 @@ class ObstacleFilter:
         return moving_obstacles_map
 
     def build_static_obstacle_polygons(
-        self, obstacles: Dict, future_path_linestring: LineString
+        self,
+        obstacles: Dict,
+        obs_in_range: Set,
+        future_path_linestring: LineString,
     ) -> Dict:
         static_obstacles_polygons_map = {}
         static_obstacles_map = {}
         for id, obs in obstacles.items():
-            if id == -9:
+            if id == -9 or (id not in obs_in_range):
                 continue
 
             if abs(obs["decision"]["obs_l"]) > self.filter_obs_max_l:

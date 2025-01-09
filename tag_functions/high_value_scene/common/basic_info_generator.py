@@ -107,6 +107,9 @@ class BasicInfoGenerartor:
         future_path_linestring = (
             data.label_scene.ego_path_info.future_path_linestring
         )
+        obs_in_range = set(
+            data.label_scene.label_res["obstacle_state"]["id_map"].keys()
+        )
 
         # 过滤l绝对值大的curb，并计算curbs的linestring
         self.basic_info.curbs_linestring_map = (
@@ -118,12 +121,19 @@ class BasicInfoGenerartor:
             self.basic_info.static_obstacles_map,
             self.basic_info.static_obstacles_polygons_map,
         ) = self.obstacle_filter.build_static_obstacle_polygons(
-            obstacles, future_path_linestring
+            obstacles, obs_in_range, future_path_linestring
         )
 
         # 筛选出动态障碍物
+        moving_obstacle_filter = ObstacleFilter(
+            filter_obs_max_l=7.0,
+            front_vehicle_rel_x=10.0,
+            front_vehicle_rel_y=0.5,
+        )
         self.basic_info.moving_obstacles_map = (
-            self.obstacle_filter.find_moving_obstacles(obstacles)
+            moving_obstacle_filter.find_moving_obstacles(
+                obstacles, obs_in_range
+            )
         )
 
         # 计算动态障碍物的未来状态的polygon
