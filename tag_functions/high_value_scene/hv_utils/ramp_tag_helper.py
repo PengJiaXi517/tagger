@@ -304,8 +304,10 @@ class RampTagHelper:
             if lane_map[cur_pred_id]["lane_category"] == "REALITY":
                 concate_len = self.exit_fork_consider_len - len(lane_polyline)
                 stitched_lane_polyline = (
-                    lane_map[cur_pred_id]["polyline"][-concate_len:]
-                    + lane_polyline
+                    np.concatenate([
+                        lane_map[cur_pred_id]["polyline"][-concate_len:], 
+                        lane_polyline
+                    ], axis=0)
                 )
 
         return stitched_lane_polyline

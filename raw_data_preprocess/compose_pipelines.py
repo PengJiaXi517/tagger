@@ -68,6 +68,10 @@ compose_pipelines = [
             "WAIT_LEFT",
             "WAIT_RIGHT",
             "WAIT_FORWARD",
+            "ABNORMAL_LANE",
+            "RIGHT_TURN_ONLY",
+            "VARIABLE_LANE",
+            "U_TURN_LANE",
         ],
         turn_type_mapping={
             "UNKNOWN_LANEDIRECTION": 0,
