@@ -55,7 +55,7 @@ def label_high_value_tag(data: TagData, params: Dict) -> Dict:
 
     # 判断是否绕行死车等障碍物
     high_value_tag.dead_car_bypass_tag = label_dead_car_bypass_tag(
-        data, basic_info
+        data, params, basic_info
     )
 
     # 结合动静障碍物距离，输出向中心线吸附的future path

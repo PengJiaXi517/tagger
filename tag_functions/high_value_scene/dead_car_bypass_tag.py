@@ -20,7 +20,8 @@ class DeadCarBypassTagHelper:
         in_road_curb_dist_thr: float = 0.6,
         in_junction_static_obs_dist_thr: float = 0.6,
         curvature_thr: float = 0.05,
-        path_point_dist_to_condition_thr: float = 0.7,
+        path_point_min_dist_to_condition: float = 0.7,
+        path_point_max_dist_to_condition: float = 6.0,
     ):
         # 判断当前点/当前时刻是否绕行时，考虑的前后索引范围,每个类别阈值可不同
         self.bypass_index_range_curb = bypass_index_range_curb
@@ -41,8 +42,9 @@ class DeadCarBypassTagHelper:
         # 判断绕行时的曲率阈值
         self.curvature_thr = curvature_thr
 
-        # path点偏离condition的距离阈值，大于该阈值才有可能是在绕行
-        self.path_point_dist_to_condition_thr = path_point_dist_to_condition_thr
+        # path点偏离condition的距离阈值
+        self.path_point_min_dist_to_condition = path_point_min_dist_to_condition
+        self.path_point_max_dist_to_condition = path_point_max_dist_to_condition
 
     def is_distance_within_range(
         self, distances: List[List[float]], dist_thr: float
@@ -138,8 +140,11 @@ class DeadCarBypassTagHelper:
                 if proj_s is None or proj_l is None:
                     continue
 
+                if abs(proj_l) > self.path_point_max_dist_to_condition:
+                    continue
+
                 if (
-                    proj_l > self.path_point_dist_to_condition_thr
+                    proj_l > self.path_point_min_dist_to_condition
                     and basic_info.future_path_turn_type[idx] < 0
                     and self.is_future_path_point_near_obstacle(
                         future_interaction_with_moving_obs,
@@ -150,7 +155,7 @@ class DeadCarBypassTagHelper:
                         1,
                     )
                 ) or (
-                    proj_l < -self.path_point_dist_to_condition_thr
+                    proj_l < -self.path_point_min_dist_to_condition
                     and basic_info.future_path_turn_type[idx] > 0
                     and self.is_future_path_point_near_obstacle(
                         future_interaction_with_moving_obs,
@@ -203,14 +208,46 @@ class DeadCarBypassTagHelper:
 
 
 def label_dead_car_bypass_tag(
-    data: TagData, basic_info: BasicInfo
+    data: TagData, params: Dict, basic_info: BasicInfo
 ) -> DeadCarBypassTag:
     future_path = data.label_scene.ego_path_info.future_path
     in_junction_id = data.label_scene.ego_path_info.in_junction_id
     corr_frame_idx = data.label_scene.ego_path_info.corr_frame_idx
 
     dead_car_bypass_tag = DeadCarBypassTag()
-    dead_car_bypass_tag_helper = DeadCarBypassTagHelper()
+    dead_car_bypass_tag_helper = DeadCarBypassTagHelper(
+        bypass_index_range_curb=params["dead_car_bypass_tag"][
+            "bypass_index_range_curb"
+        ],
+        bypass_index_range_static_obs=params["dead_car_bypass_tag"][
+            "bypass_index_range_static_obs"
+        ],
+        bypass_index_range_moving_obs=params["dead_car_bypass_tag"][
+            "bypass_index_range_moving_obs"
+        ],
+        moving_obs_index_window=params["dead_car_bypass_tag"][
+            "moving_obs_index_window"
+        ],
+        in_road_moving_obs_dist_thr=params["dead_car_bypass_tag"][
+            "in_road_moving_obs_dist_thr"
+        ],
+        in_road_static_obs_dist_thr=params["dead_car_bypass_tag"][
+            "in_road_static_obs_dist_thr"
+        ],
+        in_road_curb_dist_thr=params["dead_car_bypass_tag"][
+            "in_road_curb_dist_thr"
+        ],
+        in_junction_static_obs_dist_thr=params["dead_car_bypass_tag"][
+            "in_junction_static_obs_dist_thr"
+        ],
+        curvature_thr=params["dead_car_bypass_tag"]["curvature_thr"],
+        path_point_min_dist_to_condition=params["dead_car_bypass_tag"][
+            "path_point_min_dist_to_condition"
+        ],
+        path_point_max_dist_to_condition=params["dead_car_bypass_tag"][
+            "path_point_max_dist_to_condition"
+        ],
+    )
 
     # 判断是否有非路口绕行
     (
