@@ -22,6 +22,19 @@ tag_pipelines = {
         "large_curvature_threshold": 0.05,
         "time_window_bef_stop": 3e6,
         "sample_point_length": 1.0,
+        "dead_car_bypass_tag": {
+            "bypass_index_range_curb": 2,
+            "bypass_index_range_static_obs": 15,
+            "bypass_index_range_moving_obs": 15,
+            "moving_obs_index_window": 50,
+            "in_road_moving_obs_dist_thr": 0.6,
+            "in_road_static_obs_dist_thr": 0.6,
+            "in_road_curb_dist_thr": 0.6,
+            "in_junction_static_obs_dist_thr": 0.6,
+            "curvature_thr": 0.05,
+            "path_point_min_dist_to_condition": 0.7,
+            "path_point_max_dist_to_condition": 6.0,
+        }
     },
     "abnormal_yield_tag": {},
 }

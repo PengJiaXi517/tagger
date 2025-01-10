@@ -9,10 +9,33 @@ from tag_functions.high_value_scene.common.basic_info import BasicInfo
 
 class BypassJunctionCurbTagHelper:
     def __init__(
-        self, bypass_curvature_thr: float = 0.05, arrive_dist_thr: float = 0.35
+        self,
+        bypass_curvature_thr: float = 0.05,
+        arrive_dist_thr: float = 0.35,
+        dist_to_curb_thr_turn_left_and_uturn_leftmost: float = 2.2,
+        dist_to_curb_thr_turn_right_rightmost: float = 2.0,
+        dist_to_curb_thr_turn_right_leftmost: float = 2.0,
     ) -> None:
+        # 绕行curb时的最小曲率阈值
         self.bypass_curvature_thr = bypass_curvature_thr
+
+        # 判断是否到达目标车道的距离阈值
         self.arrive_dist_thr = arrive_dist_thr
+
+        # 左转和u-turn并且走左一车道时，与curb的距离阈值
+        self.dist_to_curb_thr_turn_left_and_uturn_leftmost = (
+            dist_to_curb_thr_turn_left_and_uturn_leftmost
+        )
+
+        # 右转并且走右一车道时，与curb的距离阈值
+        self.dist_to_curb_thr_turn_right_rightmost = (
+            dist_to_curb_thr_turn_right_rightmost
+        )
+
+        # 右转并且走左一车道时，与curb的距离阈值
+        self.dist_to_curb_thr_turn_right_leftmost = (
+            dist_to_curb_thr_turn_right_leftmost
+        )
 
     def sort_exit_group_from_left_to_right(
         self, lane_map: Dict, exit_group: List[int]
@@ -140,7 +163,7 @@ class BypassJunctionCurbTagHelper:
                     is_right=0,
                     curb_range_near=curb_range_near,
                     curb_range_far=curb_range_far,
-                    dist_to_curb_thr=2.2,
+                    dist_to_curb_thr=self.dist_to_curb_thr_turn_left_and_uturn_leftmost,
                 ):
                     return True
         elif junction_goal == "TYPE_TURN_RIGHT":
@@ -160,7 +183,7 @@ class BypassJunctionCurbTagHelper:
                     is_right=1,
                     curb_range_near=curb_range_near,
                     curb_range_far=curb_range_far,
-                    dist_to_curb_thr=2.0,
+                    dist_to_curb_thr=self.dist_to_curb_thr_turn_right_rightmost,
                 ):
                     return True
             elif sorted_exit_group.index(arrive_exit_lane_id) == 0:
@@ -176,7 +199,7 @@ class BypassJunctionCurbTagHelper:
                     is_right=0,
                     curb_range_near=curb_range_near,
                     curb_range_far=curb_range_far,
-                    dist_to_curb_thr=2.0,
+                    dist_to_curb_thr=self.dist_to_curb_thr_turn_right_leftmost,
                 ):
                     return True
 
@@ -275,9 +298,9 @@ class BypassJunctionCurbTagHelper:
 
             if len(pose_ls) > arrive_dist_from_junction_exit:
                 pose_ls = pose_ls[arrive_dist_from_junction_exit:]
-            
+
             bypass_junction_curb_tag.hit_point_num = len(pose_ls)
-            
+
             if len(pose_ls) > 0:
                 bypass_junction_curb_tag.min_pose_l_2_exit_lane = np.min(
                     pose_ls

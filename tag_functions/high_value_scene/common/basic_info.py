@@ -13,6 +13,8 @@ class BasicInfo:
         self.future_path_nearest_curb_dist: List[List[float]] = None
         self.future_bypass_junction_curb: List[bool] = None
         self.future_interaction_with_moving_obs: List[List[bool]] = None
+        self.future_path_nearest_static_obs_dist: List[List[float]] = None
+        self.future_path_nearest_moving_obs_dist: List[List[float]] = None
 
         self.static_obstacles_map: Dict[int, Dict] = None
         self.static_obstacles_polygons_map: Dict[int, Polygon] = None
@@ -25,7 +27,7 @@ class BasicInfo:
         self.future_path_curvature: np.ndarray = None
         self.future_path_turn_type: np.ndarray = None
         self.max_abs_path_curvature: float = 0.0
-
+        self.max_curvature_gradient: float = 0.0
         self.is_cross_junction: bool = False
         self.is_ego_vehicle_always_moving: bool = False
 

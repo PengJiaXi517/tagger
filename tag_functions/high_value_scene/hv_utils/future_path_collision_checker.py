@@ -52,17 +52,6 @@ class FuturePathCollisionChecker:
                 1
             ] = collision_res.right_curb_index
 
-    def update_future_path_nearest_curb_dist(
-        self,
-        future_path_nearest_curb_dist: List[List[float]],
-        collision_res: CollisionResult,
-        idx: int,
-    ) -> None:
-        if len(future_path_nearest_curb_dist) <= idx:
-            future_path_nearest_curb_dist.append(
-                [collision_res.left_curb_dist, collision_res.right_curb_dist]
-            )
-
     def check_future_path_distance_to_curb_and_static_obs(
         self,
         params: Dict,
@@ -77,6 +66,7 @@ class FuturePathCollisionChecker:
         future_narrow_road_states_loose_threshold = []
         future_path_nearby_curb_indexes = []
         future_path_nearest_curb_dist = []
+        future_path_nearest_static_obs_dist = []
 
         collision_detector = CollisionDetector(
             params["big_car_area"],
@@ -94,9 +84,6 @@ class FuturePathCollisionChecker:
             collision_res = collision_detector.check_distance_to_curb(
                 veh_polygon, curbs_linestring_map, curbs_interactive_lat_type
             )
-            self.update_future_path_nearest_curb_dist(
-                future_path_nearest_curb_dist, collision_res, idx
-            )
             self.update_future_narrow_road_states(
                 future_narrow_road_states,
                 future_narrow_road_states_loose_threshold,
@@ -104,16 +91,18 @@ class FuturePathCollisionChecker:
                 collision_res,
                 idx,
             )
-
-            if (
-                collision_res.has_obs_left_strict
-                and collision_res.has_obs_right_strict
-            ):
-                continue
+            if len(future_path_nearest_curb_dist) <= idx:
+                future_path_nearest_curb_dist.append(
+                    [
+                        collision_res.left_curb_dist,
+                        collision_res.right_curb_dist,
+                    ]
+                )
 
             collision_res = collision_detector.check_distance_to_static_obs(
                 veh_polygon, static_obstacles_map, static_obstacles_polygons_map
             )
+
             self.update_future_narrow_road_states(
                 future_narrow_road_states,
                 future_narrow_road_states_loose_threshold,
@@ -121,12 +110,21 @@ class FuturePathCollisionChecker:
                 collision_res,
                 idx,
             )
+
+            if len(future_path_nearest_static_obs_dist) <= idx:
+                future_path_nearest_static_obs_dist.append(
+                    [
+                        collision_res.left_static_obs_dist,
+                        collision_res.right_static_obs_dist,
+                    ]
+                )
 
         return (
             future_narrow_road_states,
             future_narrow_road_states_loose_threshold,
             future_path_nearby_curb_indexes,
             future_path_nearest_curb_dist,
+            future_path_nearest_static_obs_dist,
         )
 
     def check_distance_to_moving_obs_for_future_states(
@@ -150,6 +148,7 @@ class FuturePathCollisionChecker:
         ego_width = ego_obstacle["features"]["width"]
 
         future_interaction_with_moving_obs = []
+        future_path_nearest_moving_obs_dist = []
 
         for idx, ego_state in enumerate(ego_future_states):
             ts_us = ego_state["timestamp"]
@@ -180,8 +179,17 @@ class FuturePathCollisionChecker:
                     collision_res.has_obs_right_strict,
                 ]
             )
+            future_path_nearest_moving_obs_dist.append(
+                [
+                    collision_res.left_moving_obs_dist,
+                    collision_res.right_moving_obs_dist,
+                ]
+            )
 
-        return future_interaction_with_moving_obs
+        return (
+            future_interaction_with_moving_obs,
+            future_path_nearest_moving_obs_dist,
+        )
 
     def check_future_path_bypass_static_object_in_junction(
         self,

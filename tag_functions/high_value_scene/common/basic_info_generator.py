@@ -93,10 +93,22 @@ class BasicInfoGenerartor:
             self.basic_info.future_path_curvature
         ).max()
 
+        # 计算曲率的梯度绝对值的最大值
+        curvature_gradient = np.gradient(self.basic_info.future_path_curvature)
+        self.basic_info.max_curvature_gradient = np.max(
+            np.abs(curvature_gradient)
+        )
+
     def calculate_obstacles_and_curbs_basic_info(self, data: TagData) -> None:
         obstacles = data.label_scene.obstacles
         curb_decision = data.label_scene.label_res["curb_label"].get(
             "decision", None
+        )
+        future_path_linestring = (
+            data.label_scene.ego_path_info.future_path_linestring
+        )
+        obs_in_range = set(
+            data.label_scene.label_res["obstacle_state"]["id_map"].keys()
         )
 
         # 过滤l绝对值大的curb，并计算curbs的linestring
@@ -108,11 +120,20 @@ class BasicInfoGenerartor:
         (
             self.basic_info.static_obstacles_map,
             self.basic_info.static_obstacles_polygons_map,
-        ) = self.obstacle_filter.build_static_obstacle_polygons(obstacles)
+        ) = self.obstacle_filter.build_static_obstacle_polygons(
+            obstacles, obs_in_range, future_path_linestring
+        )
 
         # 筛选出动态障碍物
+        moving_obstacle_filter = ObstacleFilter(
+            filter_obs_max_l=7.0,
+            front_vehicle_rel_x=10.0,
+            front_vehicle_rel_y=0.5,
+        )
         self.basic_info.moving_obstacles_map = (
-            self.obstacle_filter.find_moving_obstacles(obstacles)
+            moving_obstacle_filter.find_moving_obstacles(
+                obstacles, obs_in_range
+            )
         )
 
         # 计算动态障碍物的未来状态的polygon
@@ -141,6 +162,7 @@ class BasicInfoGenerartor:
             self.basic_info.future_narrow_road_states_loose_threshold,
             self.basic_info.future_path_nearby_curb_indexes,
             self.basic_info.future_path_nearest_curb_dist,
+            self.basic_info.future_path_nearest_static_obs_dist,
         ) = self.future_path_collision_checker.check_future_path_distance_to_curb_and_static_obs(
             params,
             ego_path_info,
@@ -159,7 +181,10 @@ class BasicInfoGenerartor:
             self.basic_info.future_narrow_road_states_loose_threshold,
         )
 
-        self.basic_info.future_interaction_with_moving_obs = self.future_path_collision_checker.check_distance_to_moving_obs_for_future_states(
+        (
+            self.basic_info.future_interaction_with_moving_obs,
+            self.basic_info.future_path_nearest_moving_obs_dist,
+        ) = self.future_path_collision_checker.check_distance_to_moving_obs_for_future_states(
             params,
             obstacles[-9],
             self.basic_info.moving_obstacles_map,
@@ -247,5 +272,5 @@ class BasicInfoGenerartor:
     def calculate_lane_change_basic_info(self) -> None:
         self.basic_info.lane_change_direction = judge_lane_change_direction(
             self.basic_info.future_path_points_sl_coordinate_projected_to_condition,
-            self.basic_info.future_path_points_sl_coordinate_projected_to_condition_corr_type
+            self.basic_info.future_path_points_sl_coordinate_projected_to_condition_corr_type,
         )

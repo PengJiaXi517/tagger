@@ -149,6 +149,17 @@ def label_quick_lane_change_tag(
 
     quick_lane_chanege_tag.lane_change_begin_index = lane_change_begin_index
 
+    # 记录lc await的持续时间
+    quick_lane_chanege_tag.lane_change_await_time = (
+        0.1
+        * data.label_scene.ego_path_info.corr_frame_idx[
+            min(
+                lane_change_begin_index,
+                len(data.label_scene.ego_path_info.corr_frame_idx) - 1,
+            )
+        ]
+    )
+
     # 判断自车与开始变道位置之间是否有障碍物(导致当前时刻无法变道)
     (
         min_obstacle_index,
