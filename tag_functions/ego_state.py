@@ -242,7 +242,7 @@ def ego_state_occ_environment(data, params):
             break
         else:
             polygon_dis = future_path.distance(polygon)
-            if polygon_dis < ego_state_intersect_occ:
+            if polygon_dis < ego_state_nearest_occ_dis:
                 ego_state_nearest_occ_dis = polygon_dis
 
     output['ego_state_occ_environment']['ego_state_intersect_occ'] = ego_state_intersect_occ
