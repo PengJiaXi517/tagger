@@ -72,6 +72,7 @@ compose_pipelines = [
             "RIGHT_TURN_ONLY",
             "VARIABLE_LANE",
             "U_TURN_LANE",
+            "TAXI",
         ],
         turn_type_mapping={
             "UNKNOWN_LANEDIRECTION": 0,

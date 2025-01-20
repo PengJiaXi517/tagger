@@ -1,6 +1,7 @@
 import io
 import os
 import pickle
+import gzip
 from typing import Dict, List, Set, Tuple, Union
 
 import numpy as np
@@ -247,15 +248,24 @@ class LabelScene:
         self, label_path: os.PathLike, s3_client, max_valid_point_num: int = 34
     ) -> None:
         if "s3://" not in label_path:
-            with open(label_path, "rb") as f:
-                label = pickle.load(f)
+            if label_path.endswith('pklgz'):
+                with gzip.open(label_path, "rb") as f:
+                    label = pickle.loads(f.read())
+            else:
+                with open(label_path, "rb") as f:
+                    label = pickle.load(f)
         else:
             file_obj = io.BytesIO()
             s3_client.download_fileobj(
                 "pnd", label_path.split("s3://pnd/")[1], file_obj
             )
             file_obj.seek(0)
-            label = pickle.load(file_obj)
+            if label_path.endswith('pklgz'):
+                with gzip.GzipFile(fileobj=file_obj, mode='rb') as gz:
+                    # 使用 pickle 读取解压后的数据
+                    label = pickle.load(gz)
+            else:
+                label = pickle.load(file_obj)
             file_obj.close()
 
         self.ego_path_info: EgoPathInfo = EgoPathInfo(
