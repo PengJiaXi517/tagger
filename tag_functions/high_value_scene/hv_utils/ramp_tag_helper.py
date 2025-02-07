@@ -403,7 +403,7 @@ class RampTagHelper:
         valid_curb_lon_positions = []
         curb_segment_lengths = []
 
-        enclosed_polygon = Polygon(current_polyline + nearby_polyline)
+        enclosed_polygon = Polygon(np.concatenate([current_polyline, nearby_polyline], axis=0))
 
         for idx, curb_lon_position in enumerate(curb_lon_positions):
             if (
