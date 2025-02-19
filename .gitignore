@@ -169,3 +169,5 @@ work_dirs.bb*
 
 utils_*/
 video_output/
+
+test/*

@@ -1,4 +1,4 @@
-from typing import Dict, List
+from typing import List
 
 import numpy as np
 
@@ -6,21 +6,21 @@ from utils.opencv_viewer import View
 
 
 def draw_map(
-    percep_map: Dict,
+    percep_map,
     view: View,
     frame: np.ndarray,
     start_lane_seq_ids: List[List[int]] = [],
     end_lane_seq_ids: List[List[int]] = [],
 ):
 
-    for junction in percep_map["junctions"]:
+    for junction in percep_map.junctions:
         polygon = np.array(junction["polygon"])
 
         view.draw_polyline(
             frame, polygon[:, 0], polygon[:, 1], color=(0, 255, 255), thickness=3
         )
 
-    for curb in percep_map["curbs"]:
+    for curb in percep_map.curbs:
         if len(curb) > 0:
             curb = np.array(curb)
             view.draw_polyline(
@@ -37,7 +37,7 @@ def draw_map(
         end_lane_seq_ids_set.extend(lane_ids)
     end_lane_seq_ids_set = set(end_lane_seq_ids_set)
 
-    for lane in percep_map["lanes"]:
+    for lane in percep_map.lanes:
         polyline = np.array(lane["polyline"])
 
         polyline_color = (122, 122, 122)
